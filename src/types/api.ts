@@ -1,23 +1,39 @@
-// API Response Types
 export interface ApiResponse<T> {
   success: boolean
   message: string
   data: T
+  pagination?: PaginationMeta | null
+}
+
+export interface SimpleResponse {
+  success: boolean
+  message: string
 }
 
 export interface ApiError {
-  success: boolean
+  success: false
+  code: string
   message: string
-  errors?: Record<string, string[]>
+  errors: string[]
 }
+
+export const ERROR_CODES = {
+  EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  USER_NOT_FOUND: 'USER_NOT_FOUND',
+  EMAIL_ALREADY_EXISTS: 'EMAIL_ALREADY_EXISTS',
+  INVALID_OTP: 'INVALID_OTP',
+  OTP_EXPIRED: 'OTP_EXPIRED',
+  INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
+} as const
+
+export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
 
 export interface PaginatedResponse<T> {
   success: boolean
   message: string
-  data: {
-    items: T[]
-    pagination: PaginationMeta
-  }
+  data: T[]
+  pagination: PaginationMeta
 }
 
 export interface PaginationMeta {
@@ -29,24 +45,86 @@ export interface PaginationMeta {
   hasPreviousPage: boolean
 }
 
-// Auth Types
 export interface LoginRequest {
   email: string
   password: string
+  captchaToken?: string
 }
 
 export interface RegisterRequest {
+  fullname: string
   email: string
   password: string
-  fullName: string
-  phoneNumber?: string
+  phone?: string
+  addresses?: Array<{
+    fullname: string
+    phone: string
+    addressLine: string
+    city: string
+    district: string
+    ward: string
+    isDefault: boolean
+  }>
+  avatar?: string
+  captchaToken?: string
 }
 
-export interface AuthResponse {
+export type OTPType = 'verify_email' | 'reset_password' | 'change_password' | 'change_email' | 'change_info'
+
+export interface VerifyOTPRequest {
+  email: string
+  code: string
+  type: OTPType
+}
+
+export interface ResendOTPRequest {
+  email: string
+  type: OTPType
+}
+
+export interface ResetPasswordRequest {
+  email: string
+}
+
+export interface ConfirmResetPasswordRequest {
+  email: string
+  newPassword: string
+}
+
+export interface SetPasswordRequest {
+  password: string
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface RefreshTokenRequest {
+  refreshToken: string
+}
+
+export interface AuthTokens {
   accessToken: string
   refreshToken: string
-  user: UserInfo
 }
+
+export interface VerifyOTPResponse {
+  accessToken?: string
+  refreshToken?: string
+}
+
+export interface RegisterResponse {
+  _id: string
+  email: string
+  fullname: string
+  phone?: string
+  avatar?: string
+  role: UserRole
+  isEmailVerified: boolean
+}
+
+export type UserRole = 'admin' | 'customer' | 'staff' | 'manager'
 
 export interface UserInfo {
   id: string
@@ -55,11 +133,40 @@ export interface UserInfo {
   phoneNumber?: string
   avatar?: string
   role: UserRole
+  branch?: string | null
+  isEmailVerified?: boolean
 }
 
-export type UserRole = 'ADMIN' | 'CUSTOMER' | 'STAFF'
+export interface BackendUser {
+  _id: string
+  email: string
+  fullname: string
+  phone?: string
+  avatar?: string
+  role: UserRole
+  branch?: string | null
+  isEmailVerified?: boolean
+}
 
-// Product Types
+export interface ProfileResponse {
+  user: BackendUser
+}
+
+export interface TokenPayload {
+  id: string
+  email: string
+  role: UserRole
+  branch?: string | null
+  exp: number
+  iat: number
+}
+
+export interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  user: UserInfo
+}
+
 export interface Product {
   id: string
   name: string
@@ -90,7 +197,6 @@ export interface ProductFilter {
   pageSize?: number
 }
 
-// Cart Types
 export interface CartItem {
   id: string
   productId: string
@@ -107,7 +213,6 @@ export interface Cart {
   totalItems: number
 }
 
-// Order Types
 export interface Order {
   id: string
   userId: string
