@@ -1,84 +1,101 @@
-import { useEffect } from 'react'
-import { Modal, Avatar, Spin } from 'antd'
-import { User, Mail, Phone } from 'lucide-react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { Modal, Spin } from 'antd'
+import { userProfileSchema, type ProfileFormData } from '@/utils/validator'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useFieldArray, useForm } from 'react-hook-form'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import toast from '@/utils/toast'
 import useUser from '@/hooks/useUser'
-import ButtonCommon from '@/components/common/ButtonCommon'
+import ProfileHeader from './ProfileHeader'
+import ProfileContentLeft from './ProfileContentLeft'
+import ProfileContentRight from './ProfileContentRight'
 
 interface ProfileModalProps {
-  open: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const ProfileModal = ({ open, onClose }: ProfileModalProps) => {
-  const { profile, isLoading, error, fetchProfile } = useUser()
+const ProfileModalComponent = ({ isOpen, onClose }: ProfileModalProps) => {
+  const { profile, updateProfile, isLoading, fetchProfile } = useUser()
+  const [isEditMode, setIsEditMode] = useState(false)
+  const prevIsOpenRef = useRef(isOpen)
+  const { control, handleSubmit, setValue, reset } = useForm<ProfileFormData>({
+    resolver: zodResolver(userProfileSchema)
+  })
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'addresses'
+  })
 
   useEffect(() => {
-    if (open) {
+    if (isOpen && !prevIsOpenRef.current) {
       fetchProfile()
     }
-  }, [open, fetchProfile])
+    if (!isOpen && prevIsOpenRef.current) {
+      setIsEditMode(false)
+    }
+    prevIsOpenRef.current = isOpen
+  }, [isOpen, fetchProfile])
 
+  useEffect(() => {
+    if (profile) {
+      reset(profile)
+    }
+  }, [profile, reset])
+
+  const onSubmit = useCallback(
+    async (data: ProfileFormData) => {
+      const result = await updateProfile(data)
+
+      if (result) {
+        setIsEditMode(false)
+        toast.success('Cập nhật thông tin thành công')
+      } else {
+        toast.error('Cập nhật thông tin thất bại')
+      }
+    },
+    [updateProfile]
+  )
+
+  const handleButtonClick = () => {
+    if (isEditMode) {
+      handleSubmit(onSubmit)()
+    } else {
+      setIsEditMode(true)
+    }
+  }
   return (
     <Modal
-      title="Hồ sơ cá nhân"
-      open={open}
+      title='Hồ sơ cá nhân'
+      open={isOpen}
       onCancel={onClose}
       footer={null}
-      width={600}
+      width={1000}
       centered
     >
       {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Spin size="large" />
+        <div className='flex items-center justify-center py-10'>
+          <Spin size='large' />
         </div>
       ) : (
-        <div className="py-4">
-          <div className="flex items-start gap-4 mb-6">
-            <Avatar
-              size={72}
-              src={profile?.avatar || undefined}
-              icon={<User className="w-6 h-6" />}
+        <div className='max-w-5xl mx-auto'>
+          <ProfileHeader
+            isLoading={isLoading}
+            onSubmit={handleButtonClick}
+            isEditMode={isEditMode}
+          />
+
+          <div className='grid grid-cols-1 lg:grid-cols-3 gap-8 overflow-y-auto h-[calc(60vh)]'>
+            <ProfileContentLeft control={control} disabled={!isEditMode} />
+            <ProfileContentRight
+              control={control}
+              fields={fields}
+              append={append}
+              remove={remove}
+              setValue={setValue}
+              disabled={!isEditMode}
             />
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-gray-800">
-                {profile?.fullName || 'Tài khoản'}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Vai trò: <span className="font-semibold">{profile?.role || '-'}</span>
-              </p>
-            </div>
-
-            <ButtonCommon
-              type="button"
-              variant="secondary"
-              onClick={() => fetchProfile()}
-            >
-              Tải lại
-            </ButtonCommon>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4">
-            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="flex items-center gap-2 text-gray-700">
-                <Mail className="w-4 h-4" />
-                <span className="font-semibold">Email</span>
-              </div>
-              <p className="mt-1 text-gray-800">{profile?.email || '-'}</p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-gray-50 border border-gray-100">
-              <div className="flex items-center gap-2 text-gray-700">
-                <Phone className="w-4 h-4" />
-                <span className="font-semibold">Số điện thoại</span>
-              </div>
-              <p className="mt-1 text-gray-800">{profile?.phoneNumber || '-'}</p>
-            </div>
           </div>
         </div>
       )}
@@ -86,4 +103,4 @@ const ProfileModal = ({ open, onClose }: ProfileModalProps) => {
   )
 }
 
-export default ProfileModal
+export default ProfileModalComponent
