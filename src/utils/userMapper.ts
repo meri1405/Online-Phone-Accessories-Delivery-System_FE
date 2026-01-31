@@ -4,11 +4,10 @@ export function mapBackendUserToUserInfo(user: BackendUser): UserInfo {
   return {
     id: user._id,
     email: user.email,
-    fullname: user.fullname,
-    phone: user.phone,
-    avatarId: user.avatar,
+    fullName: user.fullname,
+    phoneNumber: user.phone,
     avatar: user.avatar,
     role: user.role,
-    addresses: user.addresses
   }
 }
+

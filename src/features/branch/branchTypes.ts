@@ -1,7 +1,5 @@
 import type { Branch, BranchFilter, PaginationMeta } from '@/types/api'
 
-export type { Branch, BranchFilter }
-
 export interface BranchState {
   branches: Branch[]
   selectedBranch: Branch | null
@@ -35,9 +33,9 @@ export const initialBranchState: BranchState = {
     page: 1,
     limit: 10,
     search: '',
-    isActive: undefined
+    isActive: undefined,
   },
   pagination: null,
   isLoading: false,
-  error: null
+  error: null,
 }
