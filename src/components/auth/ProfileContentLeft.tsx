@@ -5,7 +5,6 @@ import { type Control } from 'react-hook-form'
 import type { ProfileFormData } from '@/utils/validator'
 import toast from '@/utils/toast'
 
-/* eslint-disable no-unused-vars */
 interface ProfileContentLeftProps {
   control: Control<ProfileFormData>;
   avatarUrl?: string;
