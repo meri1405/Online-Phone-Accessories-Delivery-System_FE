@@ -10,44 +10,46 @@ export const fetchProfileThunk = createAsyncThunk<UserInfo, void>(
   async (_, { rejectWithValue }) => {
     try {
       const response = await userApi.getProfile()
+
       return response.data
     } catch (error) {
       const axiosError = error as AxiosError<ApiError>
       return rejectWithValue(
-        axiosError.response?.data?.message || 'Không thể tải thông tin người dùng'
+        axiosError.response?.data?.message ||
+          'Không thể tải thông tin người dùng'
       )
     }
   }
 )
 
-export const updateProfileThunk = createAsyncThunk<UserInfo, UpdateProfilePayload>(
-  'user/updateProfile',
-  async (data, { rejectWithValue }) => {
-    try {
-      const response = await userApi.updateProfile(data)
-      return response.data
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>
-      return rejectWithValue(
-        axiosError.response?.data?.message || 'Không thể cập nhật thông tin'
-      )
-    }
+export const updateProfileThunk = createAsyncThunk<
+  UserInfo,
+  UpdateProfilePayload
+>('user/updateProfile', async (data, { rejectWithValue }) => {
+  try {
+    const response = await userApi.updateProfile(data)
+    return response.data
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiError>
+    return rejectWithValue(
+      axiosError.response?.data?.message || 'Không thể cập nhật thông tin'
+    )
   }
-)
+})
 
-export const changePasswordThunk = createAsyncThunk<void, ChangePasswordPayload>(
-  'user/changePassword',
-  async (data, { rejectWithValue }) => {
-    try {
-      await userApi.changePassword(data)
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>
-      return rejectWithValue(
-        axiosError.response?.data?.message || 'Không thể đổi mật khẩu'
-      )
-    }
+export const changePasswordThunk = createAsyncThunk<
+  void,
+  ChangePasswordPayload
+>('user/changePassword', async (data, { rejectWithValue }) => {
+  try {
+    await userApi.changePassword(data)
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiError>
+    return rejectWithValue(
+      axiosError.response?.data?.message || 'Không thể đổi mật khẩu'
+    )
   }
-)
+})
 
 export const fetchAddressesThunk = createAsyncThunk<ShippingAddress[], void>(
   'user/fetchAddresses',
@@ -64,17 +66,17 @@ export const fetchAddressesThunk = createAsyncThunk<ShippingAddress[], void>(
   }
 )
 
-export const addAddressThunk = createAsyncThunk<ShippingAddress, ShippingAddress>(
-  'user/addAddress',
-  async (address, { rejectWithValue }) => {
-    try {
-      const response = await userApi.addAddress(address)
-      return response.data
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiError>
-      return rejectWithValue(
-        axiosError.response?.data?.message || 'Không thể thêm địa chỉ'
-      )
-    }
+export const addAddressThunk = createAsyncThunk<
+  ShippingAddress,
+  ShippingAddress
+>('user/addAddress', async (address, { rejectWithValue }) => {
+  try {
+    const response = await userApi.addAddress(address)
+    return response.data
+  } catch (error) {
+    const axiosError = error as AxiosError<ApiError>
+    return rejectWithValue(
+      axiosError.response?.data?.message || 'Không thể thêm địa chỉ'
+    )
   }
-)
+})
