@@ -13,4 +13,4 @@ export interface FetchOrdersPayload {
   pagination: PaginationMeta
 }
 
-export type CreateOrderPayload = CreateOrderRequest
+export interface CreateOrderPayload extends CreateOrderRequest {}

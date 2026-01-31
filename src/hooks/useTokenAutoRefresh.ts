@@ -35,7 +35,6 @@ export const useTokenAutoRefresh = () => {
       scheduleRefresh(Math.max(delay, 0))
     } catch (error) {
       // If decoding fails, attempt immediate refresh
-      /* eslint-disable no-console */
       console.error('Failed to decode access token:', error)
       scheduleRefresh(0)
     }
