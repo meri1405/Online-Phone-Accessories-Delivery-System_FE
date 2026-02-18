@@ -11,6 +11,7 @@ import type { UserRole } from '@/types/api'
 
 // Lazy load pages for better performance
 import { lazy, Suspense, type ComponentType, type ReactNode } from 'react'
+import CustomerLayout from '@/components/layout/CustomerLayout'
 
 // Lazy loaded components - Public pages
 const Home = lazy(() => import('@/pages/customer/Home'))
@@ -21,13 +22,16 @@ const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'))
 const SetPassword = lazy(() => import('@/pages/auth/SetPassword'))
 const Cart = lazy(() => import('@/pages/customer/Cart'))
 const AuthCallback = lazy(() => import('@/pages/auth/AuthCallback'))
+const AuthError = lazy(() => import('@/pages/auth/AuthError'))
+const ProductBrowse = lazy(() => import('@/pages/customer/ProductBrowse'))
+const ProductDetailPage = lazy(() => import('@/pages/customer/ProductDetailPage'))
 
 // Lazy loaded components - Management pages
 const ManagementLayout = lazy(
   () => import('@/components/layout/ManagementLayout')
 )
 const ManagementDashboard = lazy(() => import('@/pages/management/Dashboard'))
-const ManagementProducts = lazy(() => import('@/pages/management/Product'))
+// const ManagementProducts = lazy(() => import('@/pages/management/Product'))
 const ManagementOrders = lazy(() => import('@/pages/management/Order'))
 const LoaderCommon = lazy(() => import('@/components/common/LoaderCommon'))
 const BranchesManagement = lazy(
@@ -37,6 +41,7 @@ const CategoryManagement = lazy(
   () => import('@/pages/management/admin/Category')
 )
 const UsersManagement = lazy(() => import('@/pages/management/admin/User'))
+const ProductManagement = lazy(() => import('@/pages/management/ProductManagement'))
 
 /* eslint-disable no-console */
 const LoadingFallback = () => (
@@ -51,6 +56,12 @@ const withSuspense = (Component: ComponentType): ReactNode => (
   <Suspense fallback={<LoadingFallback />}>
     <Component />
   </Suspense>
+)
+
+const withCustomerLayout = (Component: ComponentType): ReactNode => (
+  <CustomerLayout>
+    {withSuspense(Component)}
+  </CustomerLayout>
 )
 
 /**
@@ -165,11 +176,19 @@ export const routes: RouteObject[] = [
   // ========================
   {
     path: ROUTES.HOME,
-    element: withSuspense(Home)
+    element: withCustomerLayout(Home)
   },
   {
     path: ROUTES.CART,
-    element: withSuspense(Cart)
+    element: withCustomerLayout(Cart)
+  },
+  {
+    path: ROUTES.PRODUCTS,
+    element: withCustomerLayout(ProductBrowse)
+  },
+  {
+    path: ROUTES.PRODUCT_DETAIL,
+    element: withCustomerLayout(ProductDetailPage)
   },
 
   // ========================
@@ -200,6 +219,10 @@ export const routes: RouteObject[] = [
     element: withSuspense(AuthCallback)
   },
   {
+    path: ROUTES.AUTH_ERROR,
+    element: withSuspense(AuthError)
+  },
+  {
     path: ROUTES.SET_PASSWORD,
     element: withSuspense(SetPassword)
   },
@@ -227,7 +250,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'products',
-        element: withSuspense(ManagementProducts)
+        element: withSuspense(ProductManagement)
       },
       {
         path: 'orders',
