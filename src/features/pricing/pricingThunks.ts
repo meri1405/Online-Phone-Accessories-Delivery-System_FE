@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit'
 import pricingApi from '@/apis/pricing'
 import { extractApiError } from '@/utils/apiError'
+import { invalidateProductCache } from '@/features/product/productSlices'
 import type {
   PricingRule,
   PricingFilter,
@@ -20,7 +21,7 @@ export const fetchPricingsThunk = createAsyncThunk<FetchPricingsPayload, Pricing
         pagination: response.pagination
       }
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the tai danh sach bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể tải danh sách bảng giá'))
     }
   }
 )
@@ -32,19 +33,20 @@ export const fetchPricingByIdThunk = createAsyncThunk<PricingRule, string>(
       const response = await pricingApi.getPricingById(id)
       return response.data
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the tai thong tin bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể tải thông tin bảng giá'))
     }
   }
 )
 
 export const createPricingThunk = createAsyncThunk<PricingRule, CreatePricingPayload>(
   'pricing/createPricing',
-  async (data, { rejectWithValue }) => {
+  async (data, { rejectWithValue, dispatch }) => {
     try {
       const response = await pricingApi.createPricing(data)
+      dispatch(invalidateProductCache())
       return response.data
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the tao bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể tạo bảng giá'))
     }
   }
 )
@@ -54,48 +56,52 @@ export const updatePricingThunk = createAsyncThunk<
   { id: string; data: UpdatePricingPayload }
 >(
   'pricing/updatePricing',
-  async ({ id, data }, { rejectWithValue }) => {
+  async ({ id, data }, { rejectWithValue, dispatch }) => {
     try {
       const response = await pricingApi.updatePricing(id, data)
+      dispatch(invalidateProductCache())
       return response.data
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the cap nhat bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể cập nhật bảng giá'))
     }
   }
 )
 
 export const deletePricingThunk = createAsyncThunk<string, string>(
   'pricing/deletePricing',
-  async (id, { rejectWithValue }) => {
+  async (id, { rejectWithValue, dispatch }) => {
     try {
       await pricingApi.deletePricing(id)
+      dispatch(invalidateProductCache())
       return id
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the xoa bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể xóa bảng giá'))
     }
   }
 )
 
 export const togglePricingStatusThunk = createAsyncThunk<PricingRule, string>(
   'pricing/togglePricingStatus',
-  async (id, { rejectWithValue }) => {
+  async (id, { rejectWithValue, dispatch }) => {
     try {
       const response = await pricingApi.togglePricingStatus(id)
+      dispatch(invalidateProductCache())
       return response.data
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the cap nhat trang thai bang gia'))
+      return rejectWithValue(extractApiError(error, 'Không thể cập nhật trạng thái bảng giá'))
     }
   }
 )
 
 export const bulkCreatePricingThunk = createAsyncThunk<PricingRule[], BulkPricingPayload>(
   'pricing/bulkCreatePricing',
-  async (data, { rejectWithValue }) => {
+  async (data, { rejectWithValue, dispatch }) => {
     try {
       const response = await pricingApi.bulkCreatePricing(data)
+      dispatch(invalidateProductCache())
       return response.data || []
     } catch (error) {
-      return rejectWithValue(extractApiError(error, 'Khong the tao bang gia hang loat'))
+      return rejectWithValue(extractApiError(error, 'Không thể tạo bảng giá hàng loạt'))
     }
   }
 )
