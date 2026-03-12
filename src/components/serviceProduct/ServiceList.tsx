@@ -2,6 +2,7 @@ import { Popconfirm, Space, Button, Tooltip } from 'antd'
 import { TableCommon } from '@/components/common'
 import type { TableColumn } from '@/components/common/TableCommon'
 import { Edit, Trash2, Power } from 'lucide-react'
+import { getProductImageUrl } from '@/utils/imageHelper'
 import dayjs from 'dayjs'
 import type { ServiceProduct } from '@/features/serviceProduct/serviceProductTypes'
 
@@ -17,7 +18,8 @@ const ServiceProductList = ({
   onPageChange,
   onEdit,
   onDelete,
-  onStatusChange
+  onStatusChange,
+  canManage
 }: {
   data: ServiceProduct[]
   loading: boolean
@@ -26,6 +28,7 @@ const ServiceProductList = ({
   onEdit: (item: ServiceProduct) => void
   onDelete: (item: ServiceProduct) => void
   onStatusChange: (id: string, status: boolean) => void
+  canManage?: boolean
 }) => {
   const dataWithKeys: ServiceProductWithKey[] = data.map((item) => ({
     ...item,
@@ -40,12 +43,17 @@ const ServiceProductList = ({
       render: (_, record) => (
         <div className='flex items-center gap-3'>
           <div className='w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex-shrink-0'>
-            {record.product.images?.[0] ? (
-              <img
-                src={typeof record.product.images[0] === 'string' ? record.product.images[0] : record.product.images[0].imageUrl}
-                alt={record.product.name}
-                className='w-full h-full object-cover'
-              />
+            {record.product.images ? (
+              (() => {
+                const url = getProductImageUrl(record.product.images);
+                return (
+                  <img
+                    src={url}
+                    alt={record.product.name}
+                    className='w-full h-full object-cover'
+                  />
+                );
+              })()
             ) : (
               <div className='w-full h-full flex items-center justify-center text-xs text-gray-400'>No img</div>
             )}
@@ -130,7 +138,10 @@ const ServiceProductList = ({
       sortable: true,
       render: (value) => <span className='text-gray-500'>{dayjs(value as string).format('DD/MM/YYYY')}</span>
     },
-    {
+  ]
+
+  if (canManage) {
+    columns.push({
       key: 'actions',
       title: 'Hành động',
       width: 150,
@@ -167,8 +178,8 @@ const ServiceProductList = ({
           </Popconfirm>
         </Space>
       )
-    }
-  ]
+    })
+  }
 
   return (
     <TableCommon<ServiceProductWithKey>
