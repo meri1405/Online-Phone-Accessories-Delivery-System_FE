@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Badge, Dropdown, Input } from 'antd'
 import {
@@ -10,11 +10,59 @@ import {
 import { ROUTES, MANAGEMENT_ROLES } from '@/constants/constant'
 import useAuth from '@/hooks/useAuth'
 import ProfileModal from '../auth/ProfileModal'
+import cartApi from '@/apis/cart'
 
 const HeaderLayout = () => {
   const { isAuthenticated, user, logout } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [cartCount, setCartCount] = useState(0)
+
+  const fetchCartCount = useCallback(async () => {
+    if (!isAuthenticated) {
+      setCartCount(0)
+      return
+    }
+
+    try {
+      const response = await cartApi.getCart()
+      const items = response.data?.items || []
+      const count = items.length
+      setCartCount(count)
+    } catch {
+      setCartCount(0)
+    }
+  }, [isAuthenticated])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchCartCount()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [fetchCartCount])
+
+  useEffect(() => {
+    const handleCartChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ type?: 'add' | 'sync'; delta?: number }>
+      const eventType = customEvent.detail?.type
+
+      if (eventType === 'add') {
+        const delta = customEvent.detail?.delta || 0
+        setCartCount((prev) => Math.max(prev + delta, 0))
+        return
+      }
+
+      fetchCartCount()
+    }
+
+    window.addEventListener('cart:changed', handleCartChanged)
+    return () => {
+      window.removeEventListener('cart:changed', handleCartChanged)
+    }
+  }, [fetchCartCount])
 
   const managementItem = user?.role && MANAGEMENT_ROLES.includes(user.role)
     ? { key: 'management', label: <Link to={ROUTES.MANAGEMENT.DASHBOARD}>Quản lý hệ thống</Link> }
@@ -23,6 +71,7 @@ const HeaderLayout = () => {
   const userMenuItems = isAuthenticated
     ? [
       { key: 'profile', label: 'Tài khoản', onClick: () => setIsProfileModalOpen(true) },
+      { key: 'change-password', label: <Link to={ROUTES.CHANGE_PASSWORD}>Đổi mật khẩu</Link> },
       { key: 'orders', label: <Link to={ROUTES.ORDERS}>Đơn hàng</Link> },
       ...(managementItem ? [managementItem] : []),
       { type: 'divider' as const },
@@ -54,7 +103,7 @@ const HeaderLayout = () => {
 
           <div className="hidden md:flex items-center space-x-4">
             <Link to={ROUTES.CART} className="relative">
-              <Badge count={3} size="small">
+              <Badge count={cartCount} size="small" showZero={false}>
                 <ShoppingCartOutlined className="text-2xl text-gray-600 hover:text-blue-600" />
               </Badge>
             </Link>
@@ -99,6 +148,18 @@ const HeaderLayout = () => {
             </Link>
             {isAuthenticated ? (
               <>
+                <Link
+                  to={ROUTES.ORDERS}
+                  className="block text-gray-600 hover:text-blue-600"
+                >
+                  Đơn hàng
+                </Link>
+                <Link
+                  to={ROUTES.CHANGE_PASSWORD}
+                  className="block text-gray-600 hover:text-blue-600"
+                >
+                  Đổi mật khẩu
+                </Link>
                 {user?.role && MANAGEMENT_ROLES.includes(user.role) && (
                   <Link
                     to={ROUTES.MANAGEMENT.DASHBOARD}

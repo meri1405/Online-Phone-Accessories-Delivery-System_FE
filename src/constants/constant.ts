@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
 export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/api/v1/auth/login',
+    LOGIN_NO_CAPTCHA: '/api/v1/auth/login/no-captcha',
     REGISTER: '/api/v1/auth/register',
     LOGOUT: '/api/v1/auth/logout',
     LOGOUT_ALL: '/api/v1/auth/logout-all',
@@ -29,6 +30,8 @@ export const API_ENDPOINTS = {
     ALL_USERS: '/api/v1/users',
     CREATE_USER: '/api/v1/users',
     GET_MANAGER: '/api/v1/users/manager',
+    GET_STAFF: '/api/v1/users/staff',
+    GET_CUSTOMERS: '/api/v1/users/customers',
     PROFILE: '/api/v1/users/profile',
     UPDATE_PROFILE: '/api/v1/users/me',
     DETAIL: (id: string) => `/api/v1/users/${id}`,
@@ -41,6 +44,7 @@ export const API_ENDPOINTS = {
   },
   PRODUCT: {
     LIST: '/api/v1/products',
+    ALL: '/api/v1/products/all',
     CREATE: '/api/v1/products',
     DETAIL: (id: string) => `/api/v1/products/${id}`,
     UPDATE: (id: string) => `/api/v1/products/${id}`,
@@ -66,6 +70,7 @@ export const API_ENDPOINTS = {
   },
   BRANCH: {
     LIST: '/api/v1/branches',
+    ALL: '/api/v1/branches/all',
     CREATE: '/api/v1/branches',
     MANAGERS: '/api/v1/branches/managers',
     DETAIL: (id: string) => `/api/v1/branches/${id}`,
@@ -81,7 +86,8 @@ export const API_ENDPOINTS = {
     DETAIL: (id: string) => `/api/v1/devices/${id}`,
     UPDATE: (id: string) => `/api/v1/devices/${id}`,
     DELETE: (id: string) => `/api/v1/devices/${id}`,
-    UPDATE_STATUS: (id: string) => `/api/v1/devices/${id}/status`
+    UPDATE_STATUS: (id: string) => `/api/v1/devices/${id}/status`,
+    ALL: '/api/v1/devices/all'
   },
   PRICING: {
     LIST: '/api/v1/pricings',
@@ -101,10 +107,13 @@ export const API_ENDPOINTS = {
     ORDERS: '/api/v1/statistics/orders',
     PRODUCTS: '/api/v1/statistics/products',
     BRANCHES: '/api/v1/statistics/branches',
+    BRANCH_PERFORMANCE: '/api/v1/statistics/branches/performance',
     CUSTOMERS: '/api/v1/statistics/customers',
     PAYMENTS: '/api/v1/statistics/payments',
     INVENTORY: '/api/v1/statistics/inventory',
-    COMPARISON: '/api/v1/statistics/comparison'
+    COMPARISON: '/api/v1/statistics/comparison',
+    RECENT_ORDERS: '/api/v1/statistics/recent-orders',
+    ORDER_STATUS_SUMMARY: '/api/v1/statistics/order-status-summary'
   },
   CART: {
     LIST: '/api/v1/carts',
@@ -125,6 +134,7 @@ export const API_ENDPOINTS = {
   },
   ORDER: {
     CREATE: '/api/v1/orders',
+    OFFLINE: '/api/v1/orders/offline',
     MY_ORDERS: '/api/v1/orders/my-orders',
     STATISTICS: '/api/v1/orders/statistics',
     ALL: '/api/v1/orders/all',
@@ -132,7 +142,8 @@ export const API_ENDPOINTS = {
     DETAIL: (orderId: string) => `/api/v1/orders/${orderId}`,
     UPDATE_STATUS: (orderId: string) => `/api/v1/orders/${orderId}/status`,
     CANCEL: (orderId: string) => `/api/v1/orders/${orderId}/cancel`,
-    UPDATE_DELIVERY: (orderId: string) => `/api/v1/orders/${orderId}/delivery`
+    UPDATE_DELIVERY: (orderId: string) => `/api/v1/orders/${orderId}/delivery`,
+    SHIPPING_FEE: (orderId: string) => `/api/v1/orders/${orderId}/shipping-fee`
   },
   PAYMENT: {
     BANKS: '/api/v1/payments/banks',
@@ -178,7 +189,12 @@ export const API_ENDPOINTS = {
     CREATE: '/api/v1/store-inventories',
     BY_BRANCH: (branchId: string) => `/api/v1/store-inventories/${branchId}`,
     OUT_OF_STOCK: (branchId: string) => `/api/v1/store-inventories/${branchId}/out-of-stock`,
-    BY_PRODUCT: (branchId: string, productId: string) => `/api/v1/store-inventories/${branchId}/${productId}`
+    LOW_STOCK: (branchId: string) => `/api/v1/store-inventories/${branchId}/low-stock`,
+    NEED_RESTOCK: (branchId: string) => `/api/v1/store-inventories/${branchId}/need-restock`,
+    OVERSTOCK: (branchId: string) => `/api/v1/store-inventories/${branchId}/overstock`,
+    UPDATE_THRESHOLDS: (branchId: string, productId: string) => `/api/v1/store-inventories/${branchId}/${productId}/thresholds`,
+    BY_PRODUCT: (branchId: string, productId: string) => `/api/v1/store-inventories/${branchId}/${productId}`,
+    DELETE: (inventoryId: string) => `/api/v1/store-inventories/${inventoryId}`
   },
   UPLOAD: {
     IMAGE: '/api/v1/uploads/images',
@@ -215,12 +231,17 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   SET_PASSWORD: '/set-password',
+  CHANGE_PASSWORD: '/change-password',
   FORGOT_PASSWORD: '/forgot-password',
   RESET_PASSWORD: '/reset-password',
   PRODUCTS: '/products',
   PRODUCT_DETAIL: '/products/:id',
   CART: '/cart',
   CHECKOUT: '/checkout',
+  PAYMENT_RESULT: '/payment-result',
+  PAYMENT_SUCCESS: '/payment/success',
+  PAYMENT_FAILED: '/payment/failed',
+  PAYMENT_ERROR: '/payment/error',
   ORDERS: '/orders',
   ORDER_DETAIL: '/orders/:id',
   PROFILE: '/profile',
@@ -238,13 +259,18 @@ export const ROUTES = {
     USERS: '/management/users',
     STAFF: '/management/staff',
     PRODUCTS: '/management/products',
+    PRICINGS: '/management/pricings',
     CATEGORIES: '/management/categories',
+    DEVICES: '/management/devices',
     ORDERS: '/management/orders',
     BRANCH_INVENTORY: '/management/branch-inventory',
     STOCK_REQUESTS: '/management/stock-requests',
     BRANCH_REPORTS: '/management/branch-reports',
     BRANCH_PROMOTIONS: '/management/branch-promotions',
-    CUSTOMER_SUPPORT: '/management/customer-support'
+    CUSTOMER_SUPPORT: '/management/customer-support',
+    SERVICES: '/management/services',
+    MANAGER_USERS: '/management/manager-users',
+    STAFF_CUSTOMERS: '/management/staff-customers'
   },
   ADMIN: {
     DASHBOARD: '/admin',
@@ -319,3 +345,14 @@ export const PAYMENT_METHOD_LABELS = {
   CREDIT_CARD: 'Thẻ tín dụng',
   E_WALLET: 'Ví điện tử'
 } as const
+
+export const SERVICE_PRODUCT_TYPE = [
+  { value: 'engraving', label: 'Khắc tên' },
+  { value: 'printing', label: 'In ảnh' },
+  { value: 'drilling', label: 'Đục lỗ' },
+  { value: 'cutting', label: 'Cắt' },
+  { value: 'embossing', label: 'Nổi chữ' },
+  { value: 'coating', label: 'Phủ' },
+  { value: 'lamination', label: 'Dán bìa' },
+  { value: 'other', label: 'Khác' }
+]

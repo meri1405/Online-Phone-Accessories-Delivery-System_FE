@@ -1,118 +1,125 @@
-import { useState } from 'react'
-import { Table, InputNumber, Button, Empty, message } from 'antd'
+import { Table, InputNumber, Button, Empty } from 'antd'
 import { DeleteOutlined, ShoppingOutlined } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/utils/formatCurrency'
+import { getProductImageUrl } from '@/utils/imageHelper'
 import { ROUTES } from '@/constants/constant'
-
-const mockCartItems = [
-  {
-    id: '1',
-    productId: 'p1',
-    product: {
-      id: 'p1',
-      name: 'Ốp lưng iPhone 15 Pro Max',
-      images: ['https://via.placeholder.com/100'],
-      price: 199000
-    },
-    quantity: 2,
-    price: 199000
-  },
-  {
-    id: '2',
-    productId: 'p2',
-    product: {
-      id: 'p2',
-      name: 'Sạc nhanh 20W Apple',
-      images: ['https://via.placeholder.com/100'],
-      price: 450000
-    },
-    quantity: 1,
-    price: 450000
-  }
-]
+import { LoaderCommon } from '@/components/common'
+import useCart from '@/hooks/useCart'
 
 const Cart = () => {
-  const [cartItems, setCartItems] = useState(mockCartItems)
-
-  const handleQuantityChange = (id: string, quantity: number | null) => {
-    if (quantity && quantity > 0) {
-      setCartItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-      )
-    }
-  }
-
-  const handleRemoveItem = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.id !== id))
-    message.success('Đã xóa sản phẩm khỏi giỏ hàng')
-  }
-
-  const totalAmount = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  )
+  const {
+    cartItems,
+    isLoading,
+    isPricingLoading,
+    totalItems,
+    totalAmount,
+    getItemPricing,
+    updateQuantity,
+    removeItem
+  } = useCart()
 
   const columns = [
     {
       title: 'Sản phẩm',
       dataIndex: 'product',
       key: 'product',
-      render: (_: unknown, record: (typeof cartItems)[0]) => (
-        <div className="flex items-center gap-4">
-          <img
-            src={record.product.images[0] || undefined}
-            alt={record.product.name}
-            className="w-20 h-20 object-cover rounded-lg"
-          />
-          <div>
-            <h4 className="font-medium text-gray-800">{record.product.name}</h4>
-            <p className="text-blue-600 font-semibold">
-              {formatCurrency(record.price)}
-            </p>
+      render: (_: unknown, record: (typeof cartItems)[0]) => {
+        const pricing = getItemPricing(record.id)?.pricing
+        const unitPrice = pricing?.pricePerUnit ?? record.price
+        const discountPercent = pricing?.discountPercentage ?? 0
+        const originalUnitPrice = pricing?.originalTotal && record.quantity > 0
+          ? pricing.originalTotal / record.quantity
+          : record.price
+        const imageUrl = getProductImageUrl(record.product.images)
+
+        return (
+          <div className="flex items-center gap-4">
+            <img
+              src={imageUrl || undefined}
+              alt={record.product.name}
+              className="w-20 h-20 object-cover rounded-lg"
+            />
+            <div>
+              <h4 className="font-medium text-gray-800">{record.product.name}</h4>
+              <div className="flex items-center gap-2">
+                <p className="text-blue-600 font-semibold">
+                  {formatCurrency(unitPrice)}
+                </p>
+                {discountPercent > 0 && originalUnitPrice > unitPrice && (
+                  <span className="text-xs text-gray-400 line-through">
+                    {formatCurrency(Math.round(originalUnitPrice))}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )
+        )
+      }
     },
     {
       title: 'Số lượng',
       dataIndex: 'quantity',
       key: 'quantity',
       width: 150,
-      render: (_: unknown, record: (typeof cartItems)[0]) => (
-        <InputNumber
-          min={1}
-          max={99}
-          value={record.quantity}
-          onChange={(value) => handleQuantityChange(record.id, value)}
-          className="w-20"
-        />
-      )
+      render: (_: unknown, record: (typeof cartItems)[0]) => {
+        const productId = record.productId || record.product?._id
+        return (
+          <InputNumber
+            min={1}
+            max={99}
+            value={record.quantity}
+            onChange={(value) => {
+              if (productId) updateQuantity(productId, value)
+            }}
+            className="w-20"
+          />
+        )
+      }
     },
     {
       title: 'Thành tiền',
       key: 'total',
       width: 150,
-      render: (_: unknown, record: (typeof cartItems)[0]) => (
-        <span className="font-semibold text-gray-800">
-          {formatCurrency(record.price * record.quantity)}
-        </span>
-      )
+      render: (_: unknown, record: (typeof cartItems)[0]) => {
+        const pricing = getItemPricing(record.id)?.pricing
+        const itemTotal = pricing?.totalPrice ?? record.price * record.quantity
+        return (
+          <span className="font-semibold text-gray-800">
+            {formatCurrency(itemTotal)}
+          </span>
+        )
+      }
     },
     {
       title: '',
       key: 'action',
       width: 80,
-      render: (_: unknown, record: (typeof cartItems)[0]) => (
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => handleRemoveItem(record.id)}
-        />
-      )
+      render: (_: unknown, record: (typeof cartItems)[0]) => {
+        const productId = record.productId || record.product?._id
+        return (
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              if (productId) removeItem(productId)
+            }}
+          />
+        )
+      }
     }
   ]
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="container mx-auto px-4">
+          <LoaderCommon size="lg" tip="Đang tải giỏ hàng..." />
+        </div>
+      </div>
+    )
+  }
 
   if (cartItems.length === 0) {
     return (
@@ -148,7 +155,7 @@ const Cart = () => {
               <Table
                 dataSource={cartItems}
                 columns={columns}
-                rowKey="id"
+                rowKey={(record) => record.id || record.productId || record.product?._id || ''}
                 pagination={false}
               />
             </div>
@@ -163,7 +170,7 @@ const Cart = () => {
 
               <div className="space-y-4 border-b border-gray-200 pb-4 mb-4">
                 <div className="flex justify-between text-gray-600">
-                  <span>Tạm tính ({cartItems.length} sản phẩm)</span>
+                  <span>Tạm tính ({totalItems} sản phẩm)</span>
                   <span>{formatCurrency(totalAmount)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
@@ -176,6 +183,11 @@ const Cart = () => {
                 <span>Tổng cộng</span>
                 <span className="text-blue-600">{formatCurrency(totalAmount)}</span>
               </div>
+              {isPricingLoading && (
+                <div className="text-xs text-gray-500 mb-4">
+                  Đang tính giá theo số lượng...
+                </div>
+              )}
 
               <Link to={ROUTES.CHECKOUT}>
                 <Button type="primary" size="large" block>

@@ -1,19 +1,44 @@
 import apiClient from '@/services/apiClient'
 import { API_ENDPOINTS } from '@/constants/constant'
-import type { ApiResponse, UserInfo, ShippingAddress, ProfileResponse } from '@/types/api'
+import type { ApiError, ApiResponse, UserInfo, ProfileResponse } from '@/types/api'
 import { mapBackendUserToUserInfo } from '@/utils/userMapper'
 import uploadApi from './upload'
+import type { AxiosError } from 'axios'
 
 export interface UpdateProfileRequest {
   fullname?: string
   phone?: string
   avatar?: string
+  addresses?: Array<{
+    fullname: string
+    phone: string
+    addressLine: string
+    city: string
+    district: string
+    ward: string
+    isDefault: boolean
+  }>
 }
 
 export interface ChangePasswordRequest {
   currentPassword: string
   newPassword: string
 }
+
+export interface ResetPasswordRequest {
+  email: string
+}
+
+export interface ConfirmResetPasswordRequest {
+  token: string
+  newPassword: string
+}
+
+export interface SetPasswordRequest {
+  password: string
+}
+
+const missingAvatarPublicIds = new Set<string>()
 
 const resolveUserAvatar = async (user: UserInfo): Promise<UserInfo> => {
   const publicId = user.avatarId || user.avatar
@@ -26,18 +51,45 @@ const resolveUserAvatar = async (user: UserInfo): Promise<UserInfo> => {
     }
   }
 
-  try {
-    const imageResponse = await uploadApi.getImage(publicId)
+  const normalizedPublicId = publicId.startsWith('uploads/')
+    ? publicId.replace(/^uploads\//, '')
+    : publicId
+
+  const candidatePublicIds = Array.from(new Set([publicId, normalizedPublicId]))
+
+  const hasKnownMissingCandidate = candidatePublicIds.some((candidateId) => missingAvatarPublicIds.has(candidateId))
+  if (hasKnownMissingCandidate) {
     return {
       ...user,
-      avatarId: publicId,
-      avatar: imageResponse.data.imageUrl
+      avatarId: normalizedPublicId,
+      avatar: undefined
     }
-  } catch {
-    return {
-      ...user,
-      avatarId: publicId
+  }
+
+  for (const candidateId of candidatePublicIds) {
+    try {
+      const imageResponse = await uploadApi.getImage(candidateId)
+      return {
+        ...user,
+        avatarId: candidateId,
+        avatar: imageResponse.data.imageUrl
+      }
+    } catch (error) {
+      const axiosError = error as AxiosError<ApiError>
+      const statusCode = axiosError.response?.status
+      const errorCode = axiosError.response?.data?.code
+      const isNotFound = statusCode === 404 || errorCode === 'NOT_FOUND'
+
+      if (isNotFound) {
+        missingAvatarPublicIds.add(candidateId)
+      }
     }
+  }
+
+  return {
+    ...user,
+    avatarId: normalizedPublicId,
+    avatar: undefined
   }
 }
 
@@ -74,17 +126,26 @@ export const userApi = {
     return response.data
   },
 
-  getAddresses: async (): Promise<ApiResponse<ShippingAddress[]>> => {
-    const response = await apiClient.get<ApiResponse<ShippingAddress[]>>(
-      API_ENDPOINTS.USER.ADDRESSES
+  resetPassword: async (data: ResetPasswordRequest): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      API_ENDPOINTS.USER.RESET_PASSWORD,
+      data
     )
     return response.data
   },
 
-  addAddress: async (address: ShippingAddress): Promise<ApiResponse<ShippingAddress>> => {
-    const response = await apiClient.post<ApiResponse<ShippingAddress>>(
-      API_ENDPOINTS.USER.ADDRESSES,
-      address
+  confirmResetPassword: async (data: ConfirmResetPasswordRequest): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      API_ENDPOINTS.USER.CONFIRM_RESET_PASSWORD,
+      data
+    )
+    return response.data
+  },
+
+  setPassword: async (data: SetPasswordRequest): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      API_ENDPOINTS.USER.SET_PASSWORD,
+      data
     )
     return response.data
   }

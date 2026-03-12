@@ -5,6 +5,7 @@ import type { Branch, BranchFilter } from '@/types/api'
 import type { CreateBranchPayload, UpdateBranchPayload } from '@/features/branch/branchTypes'
 import {
   fetchBranchesThunk,
+  fetchBranchesAllThunk,
   fetchBranchByIdThunk,
   createBranchThunk,
   updateBranchThunk,
@@ -16,8 +17,7 @@ import { setFilter, clearFilter, setSelectedBranch, clearError } from '@/feature
 
 const branchValidationSchema = z.object({
   name: z.string().min(1, 'Tên chi nhánh không được để trống').max(100, 'Tên chi nhánh không vượt quá 100 ký tự'),
-  address: z.string().min(1, 'Địa chỉ không được để trống').max(255, 'Địa chỉ không vượt quá 255 ký tự'),
-  manager: z.string().optional().nullable()
+  address: z.string().min(1, 'Địa chỉ không được để trống').max(255, 'Địa chỉ không vượt quá 255 ký tự')
 })
 
 export type BranchFormData = z.infer<typeof branchValidationSchema>
@@ -39,6 +39,12 @@ export const useBranch = () => {
   const fetchBranches = useCallback(
     async (filterData?: BranchFilter, forceRefresh = false) =>
       dispatch(fetchBranchesThunk({ filter: filterData, forceRefresh })),
+    [dispatch]
+  )
+
+  const fetchBranchesAll = useCallback(
+    async (filterData?: Omit<BranchFilter, 'page' | 'limit'>, forceRefresh = false) =>
+      dispatch(fetchBranchesAllThunk({ filter: filterData, forceRefresh })),
     [dispatch]
   )
 
@@ -124,6 +130,7 @@ export const useBranch = () => {
     isLoading,
     error,
     fetchBranches,
+    fetchBranchesAll,
     fetchBranchById,
     createBranch,
     updateBranch,

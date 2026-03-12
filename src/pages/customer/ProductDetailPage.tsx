@@ -1,8 +1,21 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProduct } from '@/hooks/useProduct'
+import { useBranch } from '@/hooks/useBranch'
 import ProductDetail from '@/components/product/ProductDetail'
+import ReviewSection from '@/components/review/ReviewSection'
 import { ButtonCommon } from '@/components/common'
+import LoginRequiredModal from '@/components/common/LoginRequiredModal'
+import cartApi from '@/apis/cart'
+import pricingApi from '@/apis/pricing'
+import { toast } from '@/utils/toast'
+import { API_ENDPOINTS, ROUTES } from '@/constants/constant'
+import apiClient from '@/services/apiClient'
+import type { Branch } from '@/types/api'
+import type { ServiceProduct } from '@/features/serviceProduct/serviceProductTypes'
+import { serviceProductApi } from '@/apis/serviceProduct'
+import type { PricingCalculation } from '@/features/pricing/pricingTypes'
+import { useAppSelector } from '@/apps/hooks'
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -14,22 +27,146 @@ const ProductDetailPage = () => {
     fetchProductById,
     fetchRelatedProducts
   } = useProduct()
+  const { branches, fetchBranches } = useBranch()
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
+  const [branchStock, setBranchStock] = useState<number | null>(null)
+  const [isStockLoading, setIsStockLoading] = useState(false)
+  const [services, setServices] = useState<ServiceProduct[]>([])
+  const [isServiceLoading, setIsServiceLoading] = useState(false)
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [quantity, setQuantity] = useState(1)
+  const [pricingData, setPricingData] = useState<PricingCalculation | null>(null)
+  const [isPricingLoading, setIsPricingLoading] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [hasFetched, setHasFetched] = useState(false)
+  const { isAuthenticated } = useAppSelector((state) => state.auth)
 
   useEffect(() => {
     if (id) {
-      fetchProductById(id)
-      fetchRelatedProducts(id, 4)
+      setHasFetched(false)
+      Promise.allSettled([
+        fetchProductById(id),
+        fetchRelatedProducts(id, 4)
+      ]).finally(() => setHasFetched(true))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const handleAddToCart = (productId: string, quantity: number) => {
-    // TODO: Implement add to cart functionality
-    // eslint-disable-next-line no-console
-    console.log('Add to cart:', productId, quantity)
+  useEffect(() => {
+    fetchBranches({ page: 1, limit: 50, isActive: true }, true)
+  }, [fetchBranches])
+
+  useEffect(() => {
+    if (!selectedBranchId && branches.length > 0) {
+      setSelectedBranchId(branches[0]._id)
+    }
+  }, [branches, selectedBranchId])
+
+  useEffect(() => {
+    if (!id) return
+    setIsServiceLoading(true)
+    serviceProductApi.getServicesByProduct(id)
+      .then((res) => {
+        const activeServices = res.data.filter((svc) => svc.isActive)
+        setServices(activeServices)
+      })
+      .catch(() => setServices([]))
+      .finally(() => setIsServiceLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    if (!id || !selectedBranchId) {
+      setBranchStock(null)
+      setIsStockLoading(false)
+      return
+    }
+    setIsStockLoading(true)
+    setBranchStock(null)
+    apiClient.get(API_ENDPOINTS.STORE_INVENTORY.BY_PRODUCT(selectedBranchId, id))
+      .then((res) => {
+        const quantityValue = res?.data?.data?.quantity
+        setBranchStock(typeof quantityValue === 'number' ? quantityValue : null)
+      })
+      .catch((err) => {
+        const status = err?.response?.status
+        // 404 = branch has no inventory record for this product → unknown, not "out of stock"
+        setBranchStock(status === 404 ? null : 0)
+      })
+      .finally(() => setIsStockLoading(false))
+  }, [id, selectedBranchId])
+
+  useEffect(() => {
+    if (!id) return
+    setIsPricingLoading(true)
+    pricingApi.calculatePrice(id, quantity)
+      .then((res) => setPricingData(res.data))
+      .catch(() => setPricingData(null))
+      .finally(() => setIsPricingLoading(false))
+  }, [id, quantity])
+
+  useEffect(() => {
+    if (branchStock && quantity > branchStock) {
+      setQuantity(branchStock)
+    }
+  }, [branchStock, quantity])
+
+  const selectedServices = useMemo(
+    () => services.filter((svc) => selectedServiceIds.includes(svc._id)),
+    [services, selectedServiceIds]
+  )
+
+  const handleToggleService = (serviceId: string) => {
+    setSelectedServiceIds((prev) =>
+      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
+    )
   }
 
-  if (!selectedProduct && !isLoading) {
+  const handleAddToCart = async (productId: string, qty: number, serviceIds: string[]) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return false
+    }
+    try {
+      const servicesPayload = serviceIds.map((serviceId) => ({ serviceId }))
+      await cartApi.addToCart(productId, qty, servicesPayload)
+      toast.success('Đã thêm vào giỏ hàng')
+      return true
+    } catch {
+      toast.error('Thêm vào giỏ hàng thất bại')
+      return false
+    }
+  }
+
+  const handleBuyNow = async (productId: string, qty: number, serviceIds: string[]) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true)
+      return
+    }
+    navigate(ROUTES.CHECKOUT, {
+      state: {
+        buyNow: {
+          product: selectedProduct,
+          quantity: qty,
+          serviceIds,
+          services: selectedServices,
+          pricingData
+        }
+      }
+    })
+  }
+
+  if (isLoading || !hasFetched) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm">Đang tải sản phẩm...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!selectedProduct) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -72,10 +209,38 @@ const ProductDetailPage = () => {
             product={selectedProduct}
             relatedProducts={relatedProducts}
             isLoading={isLoading}
+            branches={branches as Branch[]}
+            selectedBranchId={selectedBranchId}
+            onBranchChange={setSelectedBranchId}
+            branchStock={branchStock}
+            isStockLoading={isStockLoading}
+            services={services}
+            selectedServiceIds={selectedServiceIds}
+            onToggleService={handleToggleService}
+            isServiceLoading={isServiceLoading}
+            quantity={quantity}
+            onQuantityChange={setQuantity}
+            pricingData={pricingData}
+            isPricingLoading={isPricingLoading}
             onAddToCart={handleAddToCart}
+            onBuyNow={handleBuyNow}
+            selectedServices={selectedServices}
+          />
+        )}
+
+        {/* Reviews */}
+        {selectedProduct && (
+          <ReviewSection
+            productId={selectedProduct._id}
+            productName={selectedProduct.name}
           />
         )}
       </div>
+
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
     </div>
   )
 }

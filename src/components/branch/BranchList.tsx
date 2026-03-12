@@ -1,9 +1,9 @@
-import { Button, Space, Tag } from 'antd'
+import { Button, Space, Tag, Tooltip } from 'antd'
+import { Edit, Power } from 'lucide-react'
 import dayjs from 'dayjs'
 import { LoaderCommon, TableCommon } from '@/components/common'
 import type { TableColumn } from '@/components/common/TableCommon'
 import type { Branch } from '@/features/branch/branchTypes'
-import type { User } from '@/features/user/userTypes'
 
 /* eslint-disable no-unused-vars */
 interface BranchWithKey extends Record<string, unknown> {
@@ -13,7 +13,6 @@ interface BranchWithKey extends Record<string, unknown> {
 
 interface BranchListProps {
   branches: Branch[]
-  managers: User[]
   isLoading: boolean
   canManage?: boolean
   pagination?: {
@@ -28,7 +27,6 @@ interface BranchListProps {
 
 const BranchListComponent = ({
   branches,
-  managers,
   isLoading,
   canManage = false,
   pagination,
@@ -36,8 +34,6 @@ const BranchListComponent = ({
   onUpdateStatus,
   onPageChange
 }: BranchListProps) => {
-  const managerMap = new Map(managers.map(m => [m._id, m]))
-
   const rows: BranchWithKey[] = branches.map(b => ({
     ...b,
     key: b._id
@@ -65,10 +61,8 @@ const BranchListComponent = ({
       dataIndex: 'manager',
       width: 220,
       render: (value: unknown) => {
-        const id = value as string | null | undefined
-        if (!id) return '-'
-        const m = managerMap.get(id)
-        return m ? `${m.fullname} (${m.email})` : id
+        const manager = value as { id: string; name: string } | null | undefined
+        return manager?.name || '-'
       }
     },
     {
@@ -94,18 +88,24 @@ const BranchListComponent = ({
       width: 180,
       fixed: 'right',
       render: (_: unknown, record: BranchWithKey) => (
-        <Space>
-          <Button size="small" onClick={() => onEdit(record as unknown as Branch)}>
-            Sửa
-          </Button>
-          <Button
-            size="small"
-            type={record.isActive ? 'default' : 'primary'}
-            disabled={!canManage}
-            onClick={() => onUpdateStatus(record._id, !record.isActive)}
-          >
-            {record.isActive ? 'Vô hiệu' : 'Kích hoạt'}
-          </Button>
+        <Space size="small">
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="primary"
+              size="small"
+              icon={<Edit className="w-4 h-4" />}
+              onClick={() => onEdit(record as unknown as Branch)}
+            />
+          </Tooltip>
+          <Tooltip title={record.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
+            <Button
+              size="small"
+              icon={<Power className="w-4 h-4" />}
+              disabled={!canManage}
+              style={{ color: record.isActive ? '#16a34a' : '#dc2626', borderColor: record.isActive ? '#16a34a' : '#dc2626' }}
+              onClick={() => onUpdateStatus(record._id, !record.isActive)}
+            />
+          </Tooltip>
         </Space>
       )
     }

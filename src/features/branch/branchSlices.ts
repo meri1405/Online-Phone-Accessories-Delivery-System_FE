@@ -1,8 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
-import type { BranchState, Branch, FetchBranchesPayload, BranchFilter } from './branchTypes'
+import type { BranchState, Branch, FetchBranchesPayload, FetchBranchesAllPayload, BranchFilter } from './branchTypes'
 import { initialCacheMetadata, updateCacheMetadata, markCacheAsStale } from '@/utils/cacheHelper'
 import {
   fetchBranchesThunk,
+  fetchBranchesAllThunk,
   fetchBranchByIdThunk,
   createBranchThunk,
   updateBranchThunk,
@@ -66,6 +67,22 @@ const branchSlice = createSlice({
         state.error = action.payload as string
       })
 
+      // Fetch all branches (non-paginated)
+      .addCase(fetchBranchesAllThunk.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(fetchBranchesAllThunk.fulfilled, (state, action: PayloadAction<FetchBranchesAllPayload>) => {
+        state.isLoading = false
+        state.branches = action.payload.items
+        state.pagination = null
+        state.cache = updateCacheMetadata()
+      })
+      .addCase(fetchBranchesAllThunk.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+      })
+
       .addCase(fetchBranchByIdThunk.pending, (state) => {
         state.isLoading = true
         state.error = null
@@ -117,6 +134,7 @@ const branchSlice = createSlice({
         const idx = state.branches.findIndex(b => b._id === action.payload._id)
         if (idx !== -1) state.branches[idx] = action.payload
         if (state.selectedBranch?._id === action.payload._id) state.selectedBranch = action.payload
+        state.cache = markCacheAsStale()
       })
       .addCase(updateBranchStatusThunk.rejected, (state, action) => {
         state.error = action.payload as string
@@ -126,6 +144,7 @@ const branchSlice = createSlice({
         const idx = state.branches.findIndex(b => b._id === action.payload._id)
         if (idx !== -1) state.branches[idx] = action.payload
         if (state.selectedBranch?._id === action.payload._id) state.selectedBranch = action.payload
+        state.cache = markCacheAsStale()
       })
       .addCase(assignBranchManagerThunk.rejected, (state, action) => {
         state.error = action.payload as string
@@ -135,6 +154,7 @@ const branchSlice = createSlice({
         const idx = state.branches.findIndex(b => b._id === action.payload._id)
         if (idx !== -1) state.branches[idx] = action.payload
         if (state.selectedBranch?._id === action.payload._id) state.selectedBranch = action.payload
+        state.cache = markCacheAsStale()
       })
       .addCase(removeBranchManagerThunk.rejected, (state, action) => {
         state.error = action.payload as string

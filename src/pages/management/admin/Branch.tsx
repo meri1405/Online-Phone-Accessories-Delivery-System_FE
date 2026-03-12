@@ -2,10 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '@/utils/toast'
 import useBranch, { type BranchFormData } from '@/hooks/useBranch'
 import type { Branch, BranchFilter } from '@/features/branch/branchTypes'
-import { userManageApi } from '@/apis/userManage'
 import { USER_ROLES, STORAGE_KEYS } from '@/constants/constant'
 import { getStorage } from '@/utils/storage'
-import type { User } from '@/features/user/userTypes'
 import BranchHeader from '@/components/branch/BranchHeader'
 import BranchFilterComponent from '@/components/branch/BranchFilter'
 import BranchListComponent from '@/components/branch/BranchList'
@@ -29,16 +27,13 @@ const BranchesManagement = () => {
     validateBranchForm
   } = useBranch()
 
-  const [managers, setManagers] = useState<User[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
   const [formData, setFormData] = useState<BranchFormData>({
     name: '',
-    address: '',
-    manager: null
+    address: ''
   })
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lastFetchParamsRef = useRef<string>('')
 
@@ -47,19 +42,6 @@ const BranchesManagement = () => {
     ? (JSON.parse(currentUserRaw)?.role as string | undefined)
     : undefined
   const canManage = currentUserRole === USER_ROLES.ADMIN
-
-  // Fetch managers for assign-manager dropdown
-  useEffect(() => {
-    const loadManagers = async () => {
-      try {
-        const res = await userManageApi.getUsers({ page: 1, limit: 200, role: USER_ROLES.MANAGER })
-        setManagers(res.data)
-      } catch {
-        // ignore
-      }
-    }
-    loadManagers()
-  }, [])
 
   // Fetch branches on mount and when filter changes
   useEffect(() => {
@@ -91,19 +73,17 @@ const BranchesManagement = () => {
       if (branch) {
         setFormData({
           name: branch.name,
-          address: branch.address,
-          manager: branch.manager || null
+          address: branch.address
         })
         setSelectedBranchId(branch._id)
         handleSetSelectedBranch(branch)
         setIsEditMode(true)
       } else {
-        setFormData({ name: '', address: '', manager: null })
+        setFormData({ name: '', address: '' })
         setSelectedBranchId(null)
         handleSetSelectedBranch(null)
         setIsEditMode(false)
       }
-      setFormErrors({})
       setIsModalOpen(true)
     },
     [handleSetSelectedBranch]
@@ -111,40 +91,21 @@ const BranchesManagement = () => {
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false)
-    setFormData({ name: '', address: '', manager: null })
-    setFormErrors({})
+    setFormData({ name: '', address: '' })
     setIsEditMode(false)
     setSelectedBranchId(null)
     handleSetSelectedBranch(null)
   }, [handleSetSelectedBranch])
 
-  const handleFormChange = useCallback(
-    (field: keyof BranchFormData, value: string) => {
-      setFormData((prev) => ({ ...prev, [field]: value }))
-      if (formErrors[field as string]) {
-        setFormErrors((prev) => {
-          const next = { ...prev }
-          delete next[field as string]
-          return next
-        })
-      }
-    },
-    [formErrors]
-  )
-
-  const handleManagerChange = useCallback((managerId: string | null) => {
-    setFormData((prev) => ({ ...prev, manager: managerId }))
-  }, [])
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (data: { name: string; address: string }) => {
     if (!canManage) {
       toast.error('Bạn không có quyền thao tác chi nhánh')
       return
     }
 
-    const validation = validateBranchForm(formData as unknown as Record<string, unknown>)
+    const validation = validateBranchForm(data as unknown as Record<string, unknown>)
     if (!validation.valid) {
-      setFormErrors(validation.errors)
+      toast.error('Dữ liệu không hợp lệ')
       return
     }
 
@@ -153,15 +114,13 @@ const BranchesManagement = () => {
       let result
       if (isEditMode && selectedBranchId) {
         result = await updateBranch(selectedBranchId, {
-          name: formData.name,
-          address: formData.address,
-          manager: formData.manager || null
+          name: data.name,
+          address: data.address
         })
       } else {
         result = await createBranch({
-          name: formData.name,
-          address: formData.address,
-          manager: formData.manager || null
+          name: data.name,
+          address: data.address
         })
       }
 
@@ -177,7 +136,6 @@ const BranchesManagement = () => {
   }, [
     canManage,
     createBranch,
-    formData,
     handleCloseModal,
     isEditMode,
     selectedBranchId,
@@ -247,12 +205,6 @@ const BranchesManagement = () => {
     <div className="p-2">
       <BranchHeader onAddClick={() => handleOpenModal()} canManage={canManage} />
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
-      )}
-
       <BranchFilterComponent
         searchValue={(filter.search as string) || ''}
         onSearchChange={handleSearchChange}
@@ -269,7 +221,6 @@ const BranchesManagement = () => {
 
       <BranchListComponent
         branches={branches as unknown as Branch[]}
-        managers={managers}
         isLoading={isLoading}
         canManage={canManage}
         pagination={{
@@ -286,13 +237,9 @@ const BranchesManagement = () => {
         isOpen={isModalOpen}
         isEditMode={isEditMode}
         canManage={canManage}
-        managers={managers}
-        formData={formData}
-        formErrors={formErrors}
+        initialData={isEditMode && selectedBranchId ? formData : undefined}
         isSubmitting={isSubmitting}
         onClose={handleCloseModal}
-        onFormChange={handleFormChange}
-        onManagerChange={handleManagerChange}
         onSubmit={handleSubmit}
       />
     </div>

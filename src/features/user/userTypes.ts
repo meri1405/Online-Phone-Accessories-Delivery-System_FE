@@ -4,6 +4,7 @@ export interface UpdateProfilePayload {
   fullname?: string;
   phone?: string;
   avatar?: string;
+  addresses?: Address[];
 }
 
 export interface ChangePasswordPayload {
@@ -18,6 +19,9 @@ export interface Address {
   city: string;
   district: string;
   ward: string;
+  provinceCode?: string;
+  districtCode?: string;
+  wardCode?: string;
   isDefault: boolean;
 }
 
@@ -28,6 +32,7 @@ export interface User {
   role: UserRole;
   phone?: string;
   branch: string | null;
+  avatarId?: string;
   avatar?: string;
   addresses: Address[];
   isActive: boolean;
