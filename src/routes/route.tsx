@@ -63,7 +63,6 @@ const ServiceProductManagement = lazy(() => import('@/pages/management/ServicePr
 const ManagerUsersManagement = lazy(() => import('@/pages/management/ManagerUser'))
 const StaffCustomerManagement = lazy(() => import('@/pages/management/StaffCustomer'))
 
-/* eslint-disable no-console */
 const LoadingFallback = () => (
   <div className='flex items-center justify-center min-h-screen'>
     <LoaderCommon />
@@ -150,6 +149,19 @@ const AdminManagerRoute = ({ children }: { children: ReactNode }) => {
   }
 
   if (!user || (user.role !== USER_ROLES.ADMIN && user.role !== USER_ROLES.MANAGER)) {
+    return <Navigate to={ROUTES.MANAGEMENT.DASHBOARD} replace />
+  }
+
+  return <>{children}</>
+}
+
+const StaffRoute = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth)
+  if (!isAuthenticated) {
+    return <Navigate to={ROUTES.LOGIN} replace />
+  }
+
+  if (!user || user.role !== USER_ROLES.STAFF) {
     return <Navigate to={ROUTES.MANAGEMENT.DASHBOARD} replace />
   }
 
@@ -293,7 +305,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: ROUTES.MANAGEMENT.SERVICES,
-        element: <AdminManagerRoute>{withSuspense(ServiceProductManagement)}</AdminManagerRoute>
+        element: <ManagementRoute>{withSuspense(ServiceProductManagement)}</ManagementRoute>
       },
       {
         path: 'orders',
@@ -313,7 +325,11 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'reports',
-        element: <AdminRoute>{withSuspense(ManagementReports)}</AdminRoute>
+        element: <ManagementRoute>{withSuspense(ManagementReports)}</ManagementRoute>
+      },
+      {
+        path: 'branch-reports',
+        element: <ManagementRoute>{withSuspense(ManagementReports)}</ManagementRoute>
       },
       {
         path: 'categories',
@@ -341,7 +357,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'staff-customers',
-        element: <ManagementRoute>{withSuspense(StaffCustomerManagement)}</ManagementRoute>
+        element: <StaffRoute>{withSuspense(StaffCustomerManagement)}</StaffRoute>
       }
     ]
   },

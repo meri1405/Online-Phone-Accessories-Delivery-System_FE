@@ -208,6 +208,13 @@ export interface Product {
   ratingAvg: number;
   ratingCount: number;
   isActive: boolean;
+  totalStock?: number;
+  inStock?: boolean;
+  stockByBranch?: Array<{
+    branch: Branch;
+    quantity: number;
+    inStock: boolean;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -304,13 +311,14 @@ export interface StoreInventoryRecord {
   updatedAt: string;
 }
 
-export type StockRequestStatus = 'pending' | 'approved' | 'rejected';
+export type StockRequestStatus = 'pending' | 'approved' | 'partially_approved' | 'rejected';
 
 export interface StockRequestRecord {
   _id: string;
   branch: Branch;
   product: Product;
   quantity: number;
+  approvedQuantity?: number;
   requester: BackendUser;
   reason?: string;
   status: StockRequestStatus;
@@ -341,16 +349,37 @@ export interface Cart {
 }
 
 export interface Order {
+  _id?: string;
+  orderNumber?: string;
   id: string;
   userId: string;
   items: OrderItem[];
+  subtotal?: number;
+  shippingFee?: number;
   totalAmount: number;
   status: OrderStatus;
   shippingAddress: ShippingAddress;
-  paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod | 'cod' | 'vnpay' | 'bank_transfer' | 'credit_card' | 'e_wallet';
+  paymentStatus?: PaymentStatus | string;
+  payment?: {
+    status?: string;
+    paidAt?: string;
+    failureReason?: string;
+  } | null;
+  delivery?: DeliveryInfo | null;
+  message?: string;
+  branch?: Branch | string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DeliveryInfo {
+  status?: 'pending' | 'shipping' | 'delivered' | 'cancelled' | 'failed' | string;
+  providerName?: string;
+  trackingCode?: string;
+  estimatedDeliveryDate?: string | null;
+  deliveredAt?: string | null;
+  recipientName?: string;
 }
 
 export interface OrderItem {
@@ -367,13 +396,30 @@ export type OrderStatus =
   | 'CONFIRMED'
   | 'SHIPPING'
   | 'DELIVERED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'pending'
+  | 'confirmed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
 export type PaymentMethod =
   | 'COD'
   | 'BANK_TRANSFER'
   | 'CREDIT_CARD'
   | 'E_WALLET';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+// BE now returns lowercase payment status strings on order detail/list.
+// Keep legacy uppercase variants for backward compatibility.
+export type PaymentStatus =
+  | 'pending'
+  | 'success'
+  | 'failed'
+  | 'refunded'
+  | 'canceled'
+  | 'cancelled'
+  | 'PENDING'
+  | 'PAID'
+  | 'FAILED'
+  | 'REFUNDED';
 
 export interface ShippingAddress {
   fullName: string;
