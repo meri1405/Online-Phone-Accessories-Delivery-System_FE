@@ -9,7 +9,7 @@ export interface PaymentRecord {
   userId: string
   amount: number
   method: string
-  status: 'pending' | 'success' | 'failed' | 'refunded' | 'canceled'
+  status: 'pending' | 'success' | 'failed' | 'refunded' | 'cancelled'
   transactionId?: string
   providerData?: Record<string, unknown>
   createdAt: string
@@ -28,10 +28,8 @@ export interface VnpayCreateRequest {
     phone: string
     addressLine: string
     city: string
-    district: string
     ward: string
     provinceCode?: string
-    districtCode?: string
     wardCode?: string
   }
   message?: string

@@ -39,12 +39,22 @@ interface BackendItem {
   services: unknown[]
 }
 
+interface BackendServiceLike {
+  name?: string
+  serviceName?: string
+  price?: number
+  servicePrice?: number
+  service?: {
+    name?: string
+    price?: number
+  }
+}
+
 interface BackendShippingAddress {
   fullname: string
   phone: string
   addressLine: string
   city: string
-  district: string
   ward: string
 }
 
@@ -94,9 +104,29 @@ const PAYMENT_METHOD_MAP: Record<string, string> = {
 const DELIVERY_STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: 'Chờ giao', color: 'default' },
   picked_up: { label: 'Đã lấy hàng', color: 'processing' },
+  shipping: { label: 'Đang vận chuyển', color: 'blue' },
   in_transit: { label: 'Đang vận chuyển', color: 'blue' },
   delivered: { label: 'Đã giao', color: 'success' },
   failed: { label: 'Giao thất bại', color: 'error' }
+}
+
+const extractItemServices = (services: unknown[]): Array<{ name: string; price: number }> => {
+  if (!Array.isArray(services)) return []
+
+  return services
+    .map((service) => {
+      const item = service as BackendServiceLike
+      const name = item?.name || item?.serviceName || item?.service?.name
+      const rawPrice = item?.price ?? item?.servicePrice ?? item?.service?.price
+      const price = typeof rawPrice === 'number' ? rawPrice : Number(rawPrice)
+
+      if (!name || Number.isNaN(price)) {
+        return null
+      }
+
+      return { name, price }
+    })
+    .filter((item): item is { name: string; price: number } => item !== null)
 }
 
 const OrderDetailPage = () => {
@@ -105,6 +135,9 @@ const OrderDetailPage = () => {
   const [order, setOrder] = useState<BackendOrder | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelModalVisible, setCancelModalVisible] = useState(false)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelError, setCancelError] = useState("")
 
   const loadOrder = () => {
     if (!id) return
@@ -124,27 +157,34 @@ const OrderDetailPage = () => {
   const canCancel = ['pending', 'confirmed'].includes((order?.orderStatus ?? '').toLowerCase())
 
   const handleCancel = () => {
-    Modal.confirm({
-      title: 'Hủy đơn hàng',
-      icon: <ExclamationCircleOutlined />,
-      content: 'Bạn có chắc muốn hủy đơn hàng này không?',
-      okText: 'Hủy đơn',
-      okType: 'danger',
-      cancelText: 'Không',
-      onOk: async () => {
-        if (!id) return
-        setIsCancelling(true)
-        try {
-          await orderApi.cancelOrder(id)
-          message.success('Đã hủy đơn hàng thành công')
-          loadOrder()
-        } catch {
-          message.error('Không thể hủy đơn hàng')
-        } finally {
-          setIsCancelling(false)
-        }
-      }
-    })
+    setCancelModalVisible(true)
+    setCancelReason("")
+    setCancelError("")
+  }
+
+  const handleCancelOrder = async () => {
+    const trimmedReason = cancelReason.trim()
+    if (!trimmedReason) {
+      setCancelError("Vui lòng nhập lý do hủy đơn hàng.")
+      return
+    }
+    if (trimmedReason.length < 10) {
+      setCancelError("Lý do hủy phải có ít nhất 10 ký tự.")
+      return
+    }
+    if (!id) return
+    setIsCancelling(true)
+    setCancelError("")
+    try {
+      await orderApi.cancelOrder(id, cancelReason)
+      message.success("Đã hủy đơn hàng thành công")
+      setCancelModalVisible(false)
+      loadOrder()
+    } catch {
+      message.error("Không thể hủy đơn hàng")
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   const itemColumns = [
@@ -153,6 +193,8 @@ const OrderDetailPage = () => {
       key: 'product',
       render: (_: unknown, item: BackendItem) => {
         const imgUrl = getProductImageUrl(item.product.images as never)
+        const selectedServices = extractItemServices(item.services)
+
         return (
           <div className="flex items-center gap-3">
             {imgUrl ? (
@@ -164,9 +206,20 @@ const OrderDetailPage = () => {
             ) : (
               <div className="w-12 h-12 rounded bg-gray-100 flex-shrink-0" />
             )}
-            <span className="font-medium text-gray-800 line-clamp-2">
-              {item.product.name}
-            </span>
+            <div>
+              <span className="font-medium text-gray-800 line-clamp-2 block">
+                {item.product.name}
+              </span>
+              {selectedServices.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {selectedServices.map((service, index) => (
+                    <div key={`${item._id}-service-${index}`} className="text-xs text-gray-500">
+                      Dịch vụ: {service.name} ({formatCurrency(service.price)})
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )
       }
@@ -229,7 +282,7 @@ const OrderDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 space-y-5">
+      <div className="max-w-4xl mx-auto px-4 space-y-6">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
@@ -252,7 +305,7 @@ const OrderDetailPage = () => {
         </div>
 
         {/* ── Items table ── */}
-        <Card title="Sản phẩm đặt hàng" variant="borderless" className="shadow-sm">
+        <Card title="Sản phẩm đặt hàng" variant="borderless" className="shadow-sm rounded-xl">
           <Table
             dataSource={order.items}
             rowKey={(item) => item._id}
@@ -286,15 +339,17 @@ const OrderDetailPage = () => {
           </div>
         </Card>
 
-        <Row gutter={[16, 16]}>
+        
+
+        <Row gutter={[16, 16]} className="mt-2">
           {/* ── Shipping address ── */}
           <Col xs={24} md={14}>
-            <Card title="Thông tin giao hàng" variant="borderless" className="shadow-sm h-full">
+            <Card title="Thông tin giao hàng" variant="borderless" className="shadow-sm rounded-xl h-full">
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="Người nhận">{addr.fullname}</Descriptions.Item>
                 <Descriptions.Item label="Số điện thoại">{addr.phone}</Descriptions.Item>
                 <Descriptions.Item label="Địa chỉ">
-                  {[addr.addressLine, addr.ward, addr.district, addr.city]
+                  {[addr.addressLine, addr.ward, addr.city]
                     .filter(Boolean)
                     .join(', ')}
                 </Descriptions.Item>
@@ -338,7 +393,7 @@ const OrderDetailPage = () => {
 
           {/* ── Payment & branch ── */}
           <Col xs={24} md={10}>
-            <Card title="Thanh toán & Chi nhánh" variant="borderless" className="shadow-sm h-full">
+            <Card title="Thanh toán & Chi nhánh" variant="borderless" className="shadow-sm rounded-xl h-full">
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="Phương thức">
                   {PAYMENT_METHOD_MAP[payMethodKey] ?? order.paymentMethod}
@@ -363,16 +418,50 @@ const OrderDetailPage = () => {
 
         {/* ── Cancel action ── */}
         {canCancel && (
-          <div className="flex justify-end">
-            <Button
-              danger
-              size="large"
-              loading={isCancelling}
-              onClick={handleCancel}
+          <>
+            <div className="flex justify-end">
+              <Button
+                danger
+                size="large"
+                onClick={handleCancel}
+              >
+                Hủy đơn hàng
+              </Button>
+            </div>
+            <Modal
+              title="Hủy đơn hàng"
+              open={cancelModalVisible}
+              onCancel={() => setCancelModalVisible(false)}
+              footer={[
+                <Button key="cancel" onClick={() => setCancelModalVisible(false)}>
+                  Không
+                </Button>,
+                <Button
+                  key="submit"
+                  danger
+                  loading={isCancelling}
+                  onClick={handleCancelOrder}
+                >
+                  Hủy đơn
+                </Button>
+              ]}
             >
-              Hủy đơn hàng
-            </Button>
-          </div>
+              <div className="mb-2">Bạn có chắc muốn hủy đơn hàng này không?</div>
+              <div className="mb-2">
+                <label htmlFor="cancelReason" className="block mb-1 font-medium">Lý do hủy <span className="text-red-500">*</span></label>
+                <textarea
+                  id="cancelReason"
+                  rows={3}
+                  className="w-full border rounded px-2 py-1"
+                  value={cancelReason}
+                  onChange={e => setCancelReason(e.target.value)}
+                  placeholder="Nhập lý do hủy đơn hàng..."
+                  disabled={isCancelling}
+                />
+                {cancelError && <div className="text-red-500 text-sm mt-1">{cancelError}</div>}
+              </div>
+            </Modal>
+          </>
         )}
 
       </div>
