@@ -6,16 +6,17 @@ import type { Product, PaginationMeta } from '@/types/api'
 import { formatCurrency } from '@/utils/formatCurrency'
 import { getProductImageUrl } from '@/utils/imageHelper'
 
+/* eslint-disable no-unused-vars */
 interface ProductWithKey extends Record<string, unknown> {
   key: string
   _id: string
 }
 
-/* eslint-disable no-unused-vars */
 interface ProductListProps {
   products: Product[]
   pagination: PaginationMeta | null
   isLoading: boolean
+  canManage?: boolean
   onEdit: (product: Product) => void
   onDelete: (product: Product) => void
   onToggleStatus: (id: string, currentStatus: boolean) => void
@@ -26,6 +27,7 @@ const ProductList = ({
   products,
   pagination,
   isLoading,
+  canManage = true,
   onEdit,
   onDelete,
   onToggleStatus,
@@ -139,53 +141,55 @@ const ProductList = ({
         )
       }
     },
-    {
-      key: 'actions',
-      title: 'Hành động',
-      width: 120,
-      fixed: 'right',
-      render: (_: unknown, record: ProductWithKey) => {
-        const product = record as unknown as Product
-        return (
-          <Space size="small">
-            <Tooltip title="Chỉnh sửa">
-              <Button
-                type="primary"
-                size="small"
-                icon={<Edit className="w-4 h-4" />}
-                onClick={() => onEdit(product)}
-              />
-            </Tooltip>
-            <Tooltip title={product.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
-              <Button
-                size="small"
-                icon={<Power className="w-4 h-4" />}
-                style={{ color: product.isActive ? '#16a34a' : '#dc2626', borderColor: product.isActive ? '#16a34a' : '#dc2626' }}
-                onClick={() => onToggleStatus(product._id, product.isActive)}
-              />
-            </Tooltip>
-            <Tooltip title={product.isActive ? 'Vô hiệu hóa sản phẩm trước khi xóa' : 'Xóa'}>
-              <Popconfirm
-                title="Xác nhận xóa"
-                description="Bạn có chắc chắn muốn xóa sản phẩm này?"
-                okText="Xóa"
-                cancelText="Hủy"
-                onConfirm={() => onDelete(product)}
-                okButtonProps={{ danger: true }}
-                disabled={product.isActive}
-              >
+    ...(canManage
+      ? [{
+        key: 'actions',
+        title: 'Hành động',
+        width: 120,
+        fixed: 'right' as const,
+        render: (_: unknown, record: ProductWithKey) => {
+          const product = record as unknown as Product
+          return (
+            <Space size="small">
+              <Tooltip title="Chỉnh sửa">
                 <Button
-                  danger
+                  type="primary"
                   size="small"
-                  icon={<Trash2 className="w-4 h-4" />}
-                  disabled={product.isActive}
+                  icon={<Edit className="w-4 h-4" />}
+                  onClick={() => onEdit(product)}
                 />
-              </Popconfirm>
-            </Tooltip>
-          </Space>
-        )
-      }
-    }
+              </Tooltip>
+              <Tooltip title={product.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}>
+                <Button
+                  size="small"
+                  icon={<Power className="w-4 h-4" />}
+                  style={{ color: product.isActive ? '#16a34a' : '#dc2626', borderColor: product.isActive ? '#16a34a' : '#dc2626' }}
+                  onClick={() => onToggleStatus(product._id, product.isActive)}
+                />
+              </Tooltip>
+              {!product.isActive && (
+                <Popconfirm
+                  title="Xác nhận xóa"
+                  description="Bạn có chắc chắn muốn xóa sản phẩm này?"
+                  okText="Xóa"
+                  cancelText="Hủy"
+                  onConfirm={() => onDelete(product)}
+                  okButtonProps={{ danger: true }}
+                >
+                  <Tooltip title="Xóa">
+                    <Button
+                      danger
+                      size="small"
+                      icon={<Trash2 className="w-4 h-4" />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              )}
+            </Space>
+          )
+        }
+      }]
+      : [])
   ]
 
   return (

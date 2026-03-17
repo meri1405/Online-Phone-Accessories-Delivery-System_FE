@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Alert, Button } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import useStockRequest from '@/hooks/useStockRequest'
 import { toast } from '@/utils/toast'
 import { extractApiError } from '@/utils/apiError'
@@ -24,8 +24,11 @@ const StockRequestPage = () => {
     statusFilter,
     setStatusFilter,
     products,
+    availableInventoryByProduct,
     pendingCount,
     approvedCount,
+    partialCount,
+    rejectCount,
     createRequest,
     updateRequestStatus,
     selectedRequest,
@@ -42,6 +45,7 @@ const StockRequestPage = () => {
   const [actionSaving, setActionSaving] = useState(false)
   const [createSaving, setCreateSaving] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
+  const [detailActionSaving, setDetailActionSaving] = useState(false)
 
   const handleCreate = async (values: { product: string; quantity: number; reason?: string }) => {
     try {
@@ -66,11 +70,14 @@ const StockRequestPage = () => {
     setActionModalOpen(true)
   }
 
-  const handleAction = async (values: { note?: string }) => {
+  const handleAction = async (values: { note?: string; approvedQuantity?: number }) => {
     if (!actionRecord) return
     try {
       setActionSaving(true)
-      await updateRequestStatus(actionRecord._id, actionType, values.note)
+      await updateRequestStatus(actionRecord._id, actionType, {
+        note: values.note,
+        approvedQuantity: values.approvedQuantity
+      })
       toast.success(actionType === 'approve' ? 'Đã duyệt yêu cầu' : 'Đã từ chối yêu cầu')
       setActionModalOpen(false)
     } catch (err) {
@@ -85,20 +92,62 @@ const StockRequestPage = () => {
     await fetchDetail(record._id)
   }
 
+  const handleDetailApprove = async (payload: { approvedQuantity: number; note?: string }) => {
+    if (!selectedRequest) return
+    try {
+      setDetailActionSaving(true)
+      await updateRequestStatus(selectedRequest._id, 'approve', payload)
+      toast.success('Đã duyệt yêu cầu')
+      setDetailModalOpen(false)
+      setSelectedRequest(null)
+    } catch (err) {
+      toast.error(extractApiError(err, 'Không thể duyệt yêu cầu'))
+    } finally {
+      setDetailActionSaving(false)
+    }
+  }
+
+  const handleDetailReject = async (note: string) => {
+    if (!selectedRequest) return
+    try {
+      setDetailActionSaving(true)
+      await updateRequestStatus(selectedRequest._id, 'reject', { note })
+      toast.success('Đã từ chối yêu cầu')
+      setDetailModalOpen(false)
+      setSelectedRequest(null)
+    } catch (err) {
+      toast.error(extractApiError(err, 'Không thể từ chối yêu cầu'))
+    } finally {
+      setDetailActionSaving(false)
+    }
+  }
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-          {isAdmin ? 'Quản lý yêu cầu nhập kho toàn hệ thống' : 'Yêu cầu nhập kho chi nhánh'}
-        </h1>
-        <p className="text-gray-500">
-          {isAdmin
-            ? 'Duyệt và xuất kho từ inventory chung về các chi nhánh'
-            : 'Tạo yêu cầu nhập kho từ kho tổng'}
-        </p>
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {isAdmin ? 'Quản lý yêu cầu nhập kho toàn hệ thống' : 'Yêu cầu nhập kho chi nhánh'}
+          </h1>
+          <p className="text-gray-500">
+            {isAdmin
+              ? 'Duyệt và xuất kho từ inventory chung về các chi nhánh'
+              : 'Tạo yêu cầu nhập kho từ kho tổng'}
+          </p>
+        </div>
+        {isManager && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalOpen(true)}
+            className="w-full md:w-auto"
+          >
+            Tạo yêu cầu nhập kho mới
+          </Button>
+        )}
       </div>
 
-      <StockRequestStats pendingCount={pendingCount} approvedCount={approvedCount} />
+      <StockRequestStats pendingCount={pendingCount} approvedCount={approvedCount} partialCount={partialCount} rejectCount={rejectCount} />
 
       {isAdmin && pendingCount > 0 && (
         <Alert
@@ -127,19 +176,18 @@ const StockRequestPage = () => {
       )}
 
       <StockRequestFilters
-        isManager={isManager}
         statusFilter={statusFilter}
         onStatusChange={(value) => {
           setStatusFilter(value)
           setPagination((prev) => ({ ...prev, current: 1 }))
         }}
-        onCreate={() => setCreateModalOpen(true)}
       />
 
       <StockRequestTable
         data={requests}
         loading={loading}
         pagination={pagination}
+        availableInventoryByProduct={availableInventoryByProduct}
         onPaginationChange={(tablePagination) =>
           setPagination({
             current: tablePagination.current || 1,
@@ -165,6 +213,10 @@ const StockRequestPage = () => {
         isOpen={actionModalOpen}
         onClose={() => setActionModalOpen(false)}
         actionType={actionType}
+        requestedQuantity={actionRecord?.quantity}
+        availableQuantity={
+          actionRecord?.product?._id ? availableInventoryByProduct[actionRecord.product._id] : 0
+        }
         onSubmit={handleAction}
         isSubmitting={actionSaving}
       />
@@ -178,6 +230,12 @@ const StockRequestPage = () => {
         request={selectedRequest}
         loading={detailLoading}
         isAdmin={isAdmin}
+        availableQuantity={
+          selectedRequest?.product?._id ? availableInventoryByProduct[selectedRequest.product._id] : 0
+        }
+        onApprove={isAdmin ? handleDetailApprove : undefined}
+        onReject={isAdmin ? handleDetailReject : undefined}
+        isActioning={detailActionSaving}
       />
     </div>
   )
