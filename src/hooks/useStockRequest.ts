@@ -3,7 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import useAuth from '@/hooks/useAuth'
 import { USER_ROLES } from '@/constants/constant'
 import stockRequestApi, { type StockRequestQuery } from '@/apis/stockRequest'
+import inventoryApi from '@/apis/inventory'
 import productApi from '@/apis/product'
+import userApi from '@/apis/user'
 import type { Product, StockRequestRecord, StockRequestStatus } from '@/types/api'
 import { toast } from '@/utils/toast'
 import { extractApiError } from '@/utils/apiError'
@@ -29,7 +31,7 @@ export const useStockRequest = () => {
   const isAdmin = user?.role === USER_ROLES.ADMIN
   const isManager = user?.role === USER_ROLES.MANAGER
 
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
 
   const cacheRef = useRef(new Map<string, CacheEntry<unknown>>())
 
@@ -59,22 +61,36 @@ export const useStockRequest = () => {
     (searchParams.get('status') as StockRequestStatus | 'all') || 'all'
   )
   const [products, setProducts] = useState<Product[]>([])
+  const [availableInventoryByProduct, setAvailableInventoryByProduct] = useState<Record<string, number>>({})
   const [selectedRequest, setSelectedRequest] = useState<StockRequestRecord | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-
-  // Sync state to URL params
-  useEffect(() => {
-    const params: Record<string, string> = {}
-    if (statusFilter !== 'all') params.status = statusFilter
-    if (pagination.current > 1) params.page = String(pagination.current)
-    if (pagination.pageSize !== 10) params.size = String(pagination.pageSize)
-    setSearchParams(params, { replace: true })
-  }, [statusFilter, pagination.current, pagination.pageSize, setSearchParams])
+  const [resolvedBranch, setResolvedBranch] = useState<string | null | undefined>(user?.branch)
 
   const query: StockRequestQuery = useMemo(
     () => ({ page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'desc' }),
     []
   )
+
+  useEffect(() => {
+    setResolvedBranch(user?.branch)
+  }, [user?.branch])
+
+  const resolveBranchFromProfile = useCallback(async () => {
+    if (!isManager) return null
+    if (resolvedBranch) return resolvedBranch
+
+    try {
+      const profileResponse = await userApi.getProfile()
+      const latestBranch = profileResponse.data.branch
+      if (latestBranch) {
+        setResolvedBranch(latestBranch)
+        return latestBranch
+      }
+      return null
+    } catch {
+      return null
+    }
+  }, [isManager, resolvedBranch])
 
   const fetchProducts = useCallback(
     async (force = false) => {
@@ -92,16 +108,38 @@ export const useStockRequest = () => {
     [getCached, isManager, setCached]
   )
 
+  const fetchAvailableInventory = useCallback(
+    async (productId: string, force = false): Promise<number> => {
+      if (!productId) return 0
+      if (!force && availableInventoryByProduct[productId] !== undefined) {
+        return availableInventoryByProduct[productId]
+      }
+
+      try {
+        const response = await inventoryApi.getInventoryByProduct(productId)
+        const quantity = Math.max(0, response.data?.quantity || 0)
+        setAvailableInventoryByProduct((prev) => ({ ...prev, [productId]: quantity }))
+        return quantity
+      } catch {
+        setAvailableInventoryByProduct((prev) => ({ ...prev, [productId]: 0 }))
+        return 0
+      }
+    },
+    [availableInventoryByProduct]
+  )
+
   const fetchRequests = useCallback(
     async (force = false) => {
-      if (isManager && !user?.branch) return
+      const branchId = isManager ? (resolvedBranch || await resolveBranchFromProfile()) : null
+      if (isManager && !branchId) return
+
       const params = {
         ...query,
         page: pagination.current,
         limit: pagination.pageSize,
         status: statusFilter === 'all' ? undefined : statusFilter
       }
-      const cacheKey = buildKey(`stock-request:${isAdmin ? 'admin' : 'manager'}:${user?.branch || ''}`, params)
+      const cacheKey = buildKey(`stock-request:${isAdmin ? 'admin' : 'manager'}:${branchId || ''}`, params)
       const cached = !force ? getCached<{ data: StockRequestRecord[]; pagination: typeof pagination }>(cacheKey) : null
 
       if (cached) {
@@ -116,13 +154,21 @@ export const useStockRequest = () => {
       try {
         const response = isAdmin
           ? await stockRequestApi.getAll(params)
-          : await stockRequestApi.getByBranch(user?.branch || '', params)
+          : await stockRequestApi.getByBranch(branchId || '', params)
         const nextPagination = {
           total: response.pagination?.totalItems || 0,
           current: response.pagination?.currentPage || pagination.current,
           pageSize: response.pagination?.pageSize || pagination.pageSize
         }
         setRequests(response.data)
+
+        if (isAdmin && response.data.length) {
+          const uniqueProductIds = Array.from(
+            new Set(response.data.map((item) => item.product?._id).filter(Boolean))
+          ) as string[]
+          await Promise.all(uniqueProductIds.map((productId) => fetchAvailableInventory(productId, force)))
+        }
+
         setPagination((prev) => ({ ...prev, ...nextPagination }))
         setCached(cacheKey, { data: response.data, pagination: nextPagination })
       } catch (err) {
@@ -136,7 +182,19 @@ export const useStockRequest = () => {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getCached, isAdmin, isManager, pagination.current, pagination.pageSize, query, setCached, statusFilter, user?.branch]
+    [
+      getCached,
+      isAdmin,
+      isManager,
+      pagination.current,
+      pagination.pageSize,
+      query,
+      resolveBranchFromProfile,
+      resolvedBranch,
+      setCached,
+      statusFilter,
+      fetchAvailableInventory
+    ]
   )
 
   useEffect(() => {
@@ -149,32 +207,38 @@ export const useStockRequest = () => {
 
   const createRequest = useCallback(
     async (data: { product: string; quantity: number; reason?: string }) => {
-      if (!user?.branch) {
+      const branchId = resolvedBranch || await resolveBranchFromProfile()
+      const normalizedReason = data.reason?.trim()
+
+      if (!branchId) {
         throw new Error('missing_branch')
       }
+
       const response = await stockRequestApi.createStockRequest({
-        branch: user.branch,
+        branch: branchId,
         product: data.product,
         quantity: data.quantity,
-        reason: data.reason
+        ...(normalizedReason ? { reason: normalizedReason } : {})
       })
-      setRequests((prev) => [response.data, ...prev])
-      cacheRef.current.forEach((entry, key) => {
-        if (key.includes(`stock-request:${isAdmin ? 'admin' : 'manager'}:${user.branch}`)) {
-          const cached = entry.data as { data: StockRequestRecord[]; pagination: typeof pagination }
-          setCached(key, { ...cached, data: [response.data, ...cached.data] })
-        }
-      })
+      await fetchRequests(true)
+
       return response.data
     },
-    [isAdmin, setCached, user?.branch]
+    [fetchRequests, resolveBranchFromProfile, resolvedBranch]
   )
 
   const updateRequestStatus = useCallback(
-    async (requestId: string, action: 'approve' | 'reject', note?: string) => {
+    async (
+      requestId: string,
+      action: 'approve' | 'reject',
+      payload?: { note?: string; approvedQuantity?: number }
+    ) => {
       const response = action === 'approve'
-        ? await stockRequestApi.approve(requestId, note)
-        : await stockRequestApi.reject(requestId, note || '')
+        ? await stockRequestApi.approve(requestId, {
+          approvedQuantity: payload?.approvedQuantity || 0,
+          ...(payload?.note ? { note: payload.note } : {})
+        })
+        : await stockRequestApi.reject(requestId, payload?.note || '')
 
       setRequests((prev) => prev.map((item) => (item._id === response.data._id ? response.data : item)))
       cacheRef.current.forEach((entry, key) => {
@@ -183,9 +247,14 @@ export const useStockRequest = () => {
         const updated = cached.data.map((item) => (item._id === response.data._id ? response.data : item))
         setCached(key, { ...cached, data: updated })
       })
+
+      if (response.data.product?._id) {
+        await fetchAvailableInventory(response.data.product._id, true)
+      }
+
       return response.data
     },
-    [setCached]
+    [fetchAvailableInventory, setCached]
   )
 
   const pendingCount = useMemo(
@@ -197,12 +266,25 @@ export const useStockRequest = () => {
     [requests]
   )
 
+  const partialCount = useMemo(
+    () => requests.filter((req) => req.status === 'partially_approved').length,
+    [requests]
+  )
+
+  const rejectCount = useMemo(
+    () => requests.filter((req) => req.status === 'rejected').length,
+    [requests]
+  )
+
   const fetchDetail = useCallback(
     async (requestId: string) => {
       setDetailLoading(true)
       try {
         const response = await stockRequestApi.getDetail(requestId)
         setSelectedRequest(response.data)
+        if (response.data.product?._id && isAdmin) {
+          await fetchAvailableInventory(response.data.product._id)
+        }
         return response.data
       } catch (err) {
         if (isForbidden(err)) {
@@ -215,7 +297,7 @@ export const useStockRequest = () => {
         setDetailLoading(false)
       }
     },
-    []
+    [fetchAvailableInventory, isAdmin]
   )
 
   const retry = useCallback(() => {
@@ -235,8 +317,11 @@ export const useStockRequest = () => {
     statusFilter,
     setStatusFilter,
     products,
+    availableInventoryByProduct,
     pendingCount,
     approvedCount,
+    partialCount,
+    rejectCount,
     fetchRequests,
     createRequest,
     updateRequestStatus,
@@ -244,6 +329,7 @@ export const useStockRequest = () => {
     setSelectedRequest,
     detailLoading,
     fetchDetail,
+    fetchAvailableInventory,
     retry
   }
 }

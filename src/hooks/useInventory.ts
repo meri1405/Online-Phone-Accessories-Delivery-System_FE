@@ -22,13 +22,18 @@ const buildKey = (prefix: string, params: Record<string, unknown>) => {
   return `${prefix}:${JSON.stringify(params)}`
 }
 
-const isForbidden = (error: unknown): boolean => {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const resp = error as { response?: { status?: number } }
-    return resp.response?.status === 403
+const mergeMainInventoryRecord = (current: InventoryRecord, incoming: InventoryRecord): InventoryRecord => ({
+  ...current,
+  ...incoming,
+  product: {
+    ...current.product,
+    ...incoming.product,
+    category: {
+      ...current.product?.category,
+      ...incoming.product?.category
+    }
   }
-  return false
-}
+})
 
 export const useInventory = () => {
   const { user } = useAuth()
@@ -88,6 +93,7 @@ export const useInventory = () => {
   const [mainInventory, setMainInventory] = useState<InventoryRecord[]>([])
   const [productInventory, setProductInventory] = useState<InventoryRecord | null>(null)
   const [productInventoryLoading, setProductInventoryLoading] = useState(false)
+  const [lowStockTotal, setLowStockTotal] = useState(0)
   const [branchPagination, setBranchPagination] = useState<TablePaginationConfig>({
     current: parseInt(searchParams.get('bPage') || '1'),
     pageSize: parseInt(searchParams.get('bSize') || '10'),
@@ -287,6 +293,13 @@ export const useInventory = () => {
   }, [fetchBranchInventory])
 
   useEffect(() => {
+    if (!selectedBranchId) { setLowStockTotal(0); return }
+    storeInventoryApi.getLowStock(selectedBranchId, { page: 1, limit: 1 })
+      .then((res) => setLowStockTotal(res.pagination?.totalItems || 0))
+      .catch(() => setLowStockTotal(0))
+  }, [selectedBranchId])
+
+  useEffect(() => {
     fetchMainInventory().catch(() => undefined)
   }, [fetchMainInventory])
 
@@ -303,7 +316,7 @@ export const useInventory = () => {
   }, [mainInventory, searchText])
 
   const branchStats = useMemo(() => {
-    const lowStock = branchInventory.filter((item) => item.quantity < item.minThreshold).length
+    const lowStock = lowStockTotal
     const outOfStock = branchInventory.filter((item) => item.quantity <= 0).length
     const optimal = branchInventory.filter((item) => {
       if (item.quantity <= 0) return false
@@ -312,7 +325,7 @@ export const useInventory = () => {
       return true
     }).length
     return { lowStock, outOfStock, optimal }
-  }, [branchInventory])
+  }, [branchInventory, lowStockTotal])
 
   const updateThresholds = useCallback(
     async (branchId: string, productId: string, data: { minThreshold?: number; maxThreshold?: number }) => {
@@ -361,11 +374,15 @@ export const useInventory = () => {
   const updateMainInventory = useCallback(
     async (inventoryId: string, data: { quantity?: number; location?: string }) => {
       const response = await inventoryApi.updateInventory(inventoryId, data)
-      setMainInventory((prev) => prev.map((item) => (item._id === response.data._id ? response.data : item)))
+      setMainInventory((prev) => prev.map((item) => (
+        item._id === response.data._id ? mergeMainInventoryRecord(item, response.data) : item
+      )))
       cacheRef.current.forEach((value, key) => {
         if (key.startsWith('main')) {
           const cached = value.data as { data: InventoryRecord[]; pagination: TablePaginationConfig }
-          const updated = cached.data.map((item) => (item._id === response.data._id ? response.data : item))
+          const updated = cached.data.map((item) => (
+            item._id === response.data._id ? mergeMainInventoryRecord(item, response.data) : item
+          ))
           setCached(key, { ...cached, data: updated })
         }
       })
@@ -392,11 +409,15 @@ export const useInventory = () => {
   const adjustMainInventory = useCallback(
     async (productId: string, quantity: number) => {
       const response = await inventoryApi.adjustInventory(productId, quantity)
-      setMainInventory((prev) => prev.map((item) => (item.product?._id === productId ? response.data : item)))
+      setMainInventory((prev) => prev.map((item) => (
+        item.product?._id === productId ? mergeMainInventoryRecord(item, response.data) : item
+      )))
       cacheRef.current.forEach((value, key) => {
         if (key.startsWith('main')) {
           const cached = value.data as { data: InventoryRecord[]; pagination: TablePaginationConfig }
-          const updated = cached.data.map((item) => (item.product?._id === productId ? response.data : item))
+          const updated = cached.data.map((item) => (
+            item.product?._id === productId ? mergeMainInventoryRecord(item, response.data) : item
+          ))
           setCached(key, { ...cached, data: updated })
         }
       })
