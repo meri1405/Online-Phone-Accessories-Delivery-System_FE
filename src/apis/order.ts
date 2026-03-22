@@ -7,6 +7,8 @@ import type {
   CreateOrderRequest
 } from '@/types/api'
 
+const ORDER_CREATE_TIMEOUT_MS = 90_000
+
 export interface CreateCodOrderRequest {
   shippingAddress: {
     fullname: string
@@ -38,6 +40,32 @@ export interface CreateOfflineOrderRequest {
   paymentMethod: 'cod'
   message?: string
   hasDelivery?: boolean
+}
+
+export interface CheckoutPreviewRequest {
+  shippingAddress: {
+    fullname?: string
+    phone?: string
+    addressLine?: string
+    city: string
+    ward?: string
+    provinceCode?: string
+    wardCode?: string
+  }
+  items?: Array<{
+    product: string
+    quantity: number
+    services?: string[]
+  }>
+}
+
+export interface CheckoutPreviewResponse {
+  subtotal: number
+  shippingFee: number
+  totalDiscount: number
+  totalAmount: number
+  branchId: string | null
+  fulfillmentSource: 'branch' | 'main_inventory'
 }
 
 export interface OrderFilter {
@@ -90,7 +118,8 @@ export const orderApi = {
   createOrder: async (data: CreateOrderRequest): Promise<ApiResponse<Order>> => {
     const response = await apiClient.post<ApiResponse<Order>>(
       API_ENDPOINTS.ORDER.CREATE,
-      data
+      data,
+      { timeout: ORDER_CREATE_TIMEOUT_MS }
     )
     return response.data
   },
@@ -99,6 +128,15 @@ export const orderApi = {
   createCodOrder: async (data: CreateCodOrderRequest): Promise<ApiResponse<Order>> => {
     const response = await apiClient.post<ApiResponse<Order>>(
       API_ENDPOINTS.ORDER.CREATE,
+      data,
+      { timeout: ORDER_CREATE_TIMEOUT_MS }
+    )
+    return response.data
+  },
+
+  previewCheckout: async (data: CheckoutPreviewRequest): Promise<ApiResponse<CheckoutPreviewResponse>> => {
+    const response = await apiClient.post<ApiResponse<CheckoutPreviewResponse>>(
+      API_ENDPOINTS.ORDER.CHECKOUT_PREVIEW,
       data
     )
     return response.data
@@ -108,7 +146,8 @@ export const orderApi = {
   createOfflineOrder: async (data: CreateOfflineOrderRequest): Promise<ApiResponse<Order>> => {
     const response = await apiClient.post<ApiResponse<Order>>(
       API_ENDPOINTS.ORDER.OFFLINE,
-      data
+      data,
+      { timeout: ORDER_CREATE_TIMEOUT_MS }
     )
     return response.data
   },

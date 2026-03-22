@@ -26,6 +26,7 @@ interface UserListProps {
   onViewUser?: (user: User) => void
   onEditUser?: (user: User) => void
   canEditUser?: (user: User) => boolean
+  canToggleStatusUser?: (user: User) => boolean
   hideStatusToggle?: boolean
 }
 
@@ -38,6 +39,7 @@ const UserListComponent = ({
   onViewUser,
   onEditUser,
   canEditUser,
+  canToggleStatusUser,
   hideStatusToggle = false
 }: UserListProps) => {
   const { user: currentUser } = useAuth()
@@ -58,6 +60,7 @@ const UserListComponent = ({
   const canToggleStatusForUser = (targetUser: User) => {
     if (hideStatusToggle || !onUpdateStatus) return false
     if (currentUserId && targetUser._id === currentUserId) return false
+    if (canToggleStatusUser && !canToggleStatusUser(targetUser)) return false
 
     if (currentUserRole === 'admin') return true
 
@@ -69,7 +72,20 @@ const UserListComponent = ({
     return targetUser.role === 'staff'
   }
 
+  const currentPage = pagination?.page || 1
+  const pageSize = pagination?.limit || 10
   const tableColumns: TableColumn<UserWithKey>[] = [
+    {
+      key: 'stt',
+      title: 'STT',
+      width: 70,
+      align: 'center',
+      fixed: 'left',
+      render: (_: unknown, __: UserWithKey, index: number) => {
+        const serialNumber = (currentPage - 1) * pageSize + index + 1
+        return <span className="font-medium text-gray-700">#{serialNumber}</span>
+      }
+    },
     {
       key: 'fullname',
       title: 'Họ và tên',
@@ -154,7 +170,7 @@ const UserListComponent = ({
                 size="small"
                 icon={<Power className="w-4 h-4" />}
                 style={{ color: record.isActive ? '#16a34a' : '#dc2626', borderColor: record.isActive ? '#16a34a' : '#dc2626' }}
-                onClick={() => onUpdateStatus(record._id, !record.isActive)}
+                onClick={() => onUpdateStatus?.(record._id, !record.isActive)}
               />
             </Tooltip>
           )}

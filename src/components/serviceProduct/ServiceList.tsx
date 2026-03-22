@@ -36,7 +36,20 @@ const ServiceProductList = ({
     key: item._id
   }))
 
+  const currentPage = pagination.page || 1
+  const pageSize = pagination.limit || 10
   const columns: TableColumn<ServiceProductWithKey>[] = [
+    {
+      key: 'stt',
+      title: 'STT',
+      width: 70,
+      align: 'center',
+      fixed: 'left',
+      render: (_: unknown, __: ServiceProductWithKey, index: number) => {
+        const serialNumber = (currentPage - 1) * pageSize + index + 1
+        return <span className="font-medium text-gray-700">#{serialNumber}</span>
+      }
+    },
     {
       key: 'product',
       title: 'Sản phẩm áp dụng',
@@ -76,8 +89,16 @@ const ServiceProductList = ({
       sortable: true,
       render: (value, record) => (
         <div className='flex flex-col'>
-          <span className='font-medium text-gray-800'>{value as string}</span>
-          <span className='text-xs text-gray-500 line-clamp-1'>{record.description}</span>
+          <Tooltip title={String(value || '-') }>
+            <span className='font-medium text-gray-800 max-w-[220px] overflow-hidden whitespace-nowrap text-ellipsis'>
+              {String(value || '-')}
+            </span>
+          </Tooltip>
+          <Tooltip title={String(record.description || '-') }>
+            <span className='text-xs text-gray-500 max-w-[220px] overflow-hidden whitespace-nowrap text-ellipsis'>
+              {String(record.description || '-')}
+            </span>
+          </Tooltip>
         </div>
       )
     },

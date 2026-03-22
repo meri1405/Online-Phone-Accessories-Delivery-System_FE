@@ -38,7 +38,21 @@ const ProductList = ({
     key: p._id
   }))
 
+  const currentPage = pagination?.currentPage || 1
+  const pageSize = pagination?.pageSize || 10
+
   const columns: TableColumn<ProductWithKey>[] = [
+    {
+      key: 'stt',
+      title: 'STT',
+      width: 70,
+      align: 'center',
+      fixed: 'left',
+      render: (_: unknown, __: ProductWithKey, index: number) => {
+        const serialNumber = (currentPage - 1) * pageSize + index + 1
+        return <span className="font-medium text-gray-700">#{serialNumber}</span>
+      }
+    },
     {
       key: 'image',
       title: 'Hình ảnh',
@@ -86,7 +100,17 @@ const ProductList = ({
       title: 'Mô tả',
       dataIndex: 'description',
       width: 200,
-      ellipsis: true
+      ellipsis: true,
+      render: (value: unknown) => {
+        const description = typeof value === 'string' ? value : ''
+        return (
+          <Tooltip title={description || '-'}>
+            <div className="max-w-[360px] overflow-hidden whitespace-nowrap text-ellipsis text-gray-700">
+              {description || '-'}
+            </div>
+          </Tooltip>
+        )
+      }
     },
     {
       key: 'price',
