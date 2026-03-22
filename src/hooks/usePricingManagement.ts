@@ -136,6 +136,7 @@ export const usePricingManagement = () => {
   }, [])
 
   useEffect(() => {
+    const normalizedSearch = typeof filter.search === 'string' ? filter.search.trim() : ''
     const isActiveFilter = filter.isActive === 'true'
       ? true
       : filter.isActive === 'false'
@@ -145,6 +146,7 @@ export const usePricingManagement = () => {
     const filterParams: PricingFilter = {
       page: (filter.page as number) || 1,
       limit: (filter.limit as number) || 10,
+      search: normalizedSearch || undefined,
       productId: (filter.productId as string) || undefined,
       isActive: isActiveFilter
     }
@@ -263,6 +265,25 @@ export const usePricingManagement = () => {
       return
     }
 
+    const selectedProduct = products.find((product) => product._id === formData.productId)
+    if (!selectedProduct) {
+      setFormErrors((prev) => ({
+        ...prev,
+        productId: 'Không tìm thấy sản phẩm để đối chiếu giá gốc'
+      }))
+      return
+    }
+
+    if (formData.pricePerUnit > selectedProduct.price) {
+      const errorMessage = 'Giá theo bảng giá không được cao hơn giá gốc của sản phẩm'
+      setFormErrors((prev) => ({
+        ...prev,
+        pricePerUnit: errorMessage
+      }))
+      toast.error(errorMessage)
+      return
+    }
+
     setIsSubmitting(true)
     try {
       let result
@@ -292,7 +313,7 @@ export const usePricingManagement = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [formData, isEditMode, selectedPricingId, validatePricingForm, updatePricing, createPricing, handleCloseModal])
+  }, [formData, isEditMode, selectedPricingId, validatePricingForm, updatePricing, createPricing, handleCloseModal, products])
 
   const handleDelete = useCallback(async (id: string) => {
     const result = await deletePricing(id)
@@ -320,6 +341,18 @@ export const usePricingManagement = () => {
       return
     }
 
+    const selectedProduct = products.find((product) => product._id === parsed.data.productId)
+    if (!selectedProduct) {
+      toast.error('Không tìm thấy sản phẩm để đối chiếu giá gốc')
+      return
+    }
+
+    const invalidTierIndex = parsed.data.tiers.findIndex((tier) => tier.pricePerUnit > selectedProduct.price)
+    if (invalidTierIndex !== -1) {
+      toast.error(`Giá ở mức ${invalidTierIndex + 1} không được cao hơn giá gốc của sản phẩm`)
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const payload = {
@@ -342,9 +375,12 @@ export const usePricingManagement = () => {
           : filter.isActive === 'false'
             ? false
             : undefined
+        const normalizedSearch = typeof filter.search === 'string' ? filter.search.trim() : ''
+
         fetchPricings({
           page: (filter.page as number) || 1,
           limit: (filter.limit as number) || 10,
+          search: normalizedSearch || undefined,
           productId: (filter.productId as string) || undefined,
           isActive: isActiveFilter
         })
@@ -354,7 +390,7 @@ export const usePricingManagement = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }, [bulkCreatePricing, fetchPricings, filter, setIsBulkModalOpen])
+  }, [bulkCreatePricing, fetchPricings, filter, products, setIsBulkModalOpen])
 
   return {
     pricings,

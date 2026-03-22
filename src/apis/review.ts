@@ -5,19 +5,37 @@ import type { ReviewEligibility } from '@/features/review/reviewTypes'
 
 export interface Review {
   _id: string
-  userId: string
-  productId: string
+  userId: string | {
+    _id: string
+    fullname: string
+    email?: string
+    avatar?: string
+  }
+  productId: string | {
+    _id: string
+    name: string
+    slug?: string
+    images?: Array<string | { imageUrl: string }>
+  }
   orderId?: string
   rating: number
   comment?: string
   images?: Array<{ publicId: string; imageUrl: string }>
   isVerifiedPurchase: boolean
+  isDeleted?: boolean
   createdAt: string
   updatedAt: string
   user?: {
     _id: string
     fullname: string
+    email?: string
     avatar?: string
+  }
+  product?: {
+    _id: string
+    name: string
+    slug?: string
+    images?: Array<string | { imageUrl: string }>
   }
 }
 
@@ -29,7 +47,6 @@ export interface ReviewStats {
 
 export interface CreateReviewRequest {
   productId: string
-  orderId?: string
   rating: number
   comment?: string
   images?: File[]
@@ -44,6 +61,7 @@ export interface UpdateReviewRequest {
 export interface ReviewFilter {
   page?: number
   limit?: number
+  productId?: string
   rating?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -54,7 +72,6 @@ export const reviewApi = {
   createReview: async (data: CreateReviewRequest): Promise<ApiResponse<Review>> => {
     const formData = new FormData()
     formData.append('productId', data.productId)
-    if (data.orderId) formData.append('orderId', data.orderId)
     formData.append('rating', String(data.rating))
     if (data.comment) formData.append('comment', data.comment)
     if (data.images) {

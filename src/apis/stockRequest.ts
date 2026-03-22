@@ -2,12 +2,17 @@ import apiClient from '@/services/apiClient'
 import { API_ENDPOINTS } from '@/constants/constant'
 import type { ApiResponse, PaginatedResponse, StockRequestRecord, StockRequestStatus } from '@/types/api'
 
+const STOCK_REQUEST_APPROVE_TIMEOUT_MS = 90_000
+
 export interface StockRequestQuery {
+  search?: string
   page?: number
   limit?: number
   status?: StockRequestStatus
   sortBy?: 'createdAt' | 'quantity' | 'status'
   sortOrder?: 'asc' | 'desc'
+  branchId?: string
+  productId?: string
 }
 
 export interface CreateStockRequestPayload {
@@ -68,7 +73,8 @@ export const stockRequestApi = {
   ): Promise<ApiResponse<StockRequestRecord>> => {
     const response = await apiClient.put<ApiResponse<StockRequestRecord>>(
       API_ENDPOINTS.STOCK_REQUEST.APPROVE(requestId),
-      data
+      data,
+      { timeout: STOCK_REQUEST_APPROVE_TIMEOUT_MS }
     )
     return response.data
   },

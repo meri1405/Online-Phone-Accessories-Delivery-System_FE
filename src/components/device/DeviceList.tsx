@@ -49,13 +49,37 @@ const DeviceListComponent = ({
     key: device._id
   }))
 
+  const currentPage = pagination?.page || 1
+  const pageSize = pagination?.limit || 10
   const tableColumns: TableColumn<DeviceWithKey>[] = [
+    {
+      key: 'stt',
+      title: 'STT',
+      width: 70,
+      align: 'center',
+      fixed: 'left',
+      render: (_: unknown, __: DeviceWithKey, index: number) => {
+        const serialNumber = (currentPage - 1) * pageSize + index + 1
+        return <span className="font-medium text-gray-700">#{serialNumber}</span>
+      }
+    },
     {
       key: 'name',
       title: 'Tên thiết bị',
       dataIndex: 'name',
       width: 180,
-      sortable: true
+      sortable: true,
+      ellipsis: true,
+      render: (value: unknown) => {
+        const name = typeof value === 'string' ? value : '-'
+        return (
+          <Tooltip title={name}>
+            <div className="max-w-[200px] overflow-hidden whitespace-nowrap text-ellipsis">
+              {name}
+            </div>
+          </Tooltip>
+        )
+      }
     },
     {
       key: 'type',
@@ -68,13 +92,35 @@ const DeviceListComponent = ({
       key: 'brand',
       title: 'Thương hiệu',
       dataIndex: 'brand',
-      width: 150
+      width: 150,
+      ellipsis: true,
+      render: (value: unknown) => {
+        const brand = typeof value === 'string' ? value : '-'
+        return (
+          <Tooltip title={brand}>
+            <div className="max-w-[170px] overflow-hidden whitespace-nowrap text-ellipsis">
+              {brand}
+            </div>
+          </Tooltip>
+        )
+      }
     },
     {
       key: 'model',
       title: 'Model',
       dataIndex: 'model',
-      width: 160
+      width: 160,
+      ellipsis: true,
+      render: (value: unknown) => {
+        const model = typeof value === 'string' ? value : '-'
+        return (
+          <Tooltip title={model}>
+            <div className="max-w-[180px] overflow-hidden whitespace-nowrap text-ellipsis">
+              {model}
+            </div>
+          </Tooltip>
+        )
+      }
     },
     {
       key: 'isActive',
